@@ -1,22 +1,23 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  Trash2, 
-  Edit3, 
-  CheckSquare, 
-  Square,
-  AlertTriangle,
-  CheckCircle2,
+import {
   AlertCircle,
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  CheckSquare,
+  Clock,
+  Edit3,
   Plus,
-  ArrowRight
+  Square,
+  Trash2,
+  X,
 } from "lucide-react";
-import { updateTask, deleteTask, getCategories, generateId } from "@/app/trackdaily/db";
-import { Task, ChecklistItem } from "@/app/trackdaily/types";
+import { generateId, getCategories } from "@/app/trackdaily/db";
+import { ChecklistItem, Task } from "@/app/trackdaily/types";
+import { useToast } from "@/components/Toast";
+import { useTrackDailyContext } from "@/context/TrackDailyContext";
 
 interface TaskDetailDrawerProps {
   isOpen: boolean;
@@ -31,12 +32,12 @@ export default function TaskDetailDrawer({
   task,
   onTaskUpdated,
 }: TaskDetailDrawerProps) {
+  const { addToast } = useToast();
+  const { updateTask, deleteTask } = useTrackDailyContext();
   const [isEditing, setIsEditing] = useState(false);
   const [showSkipReasonInput, setShowSkipReasonInput] = useState(false);
   const [skipReason, setSkipReason] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  // Form states for Editing (initialized directly from task prop)
   const [editTitle, setEditTitle] = useState(task.title);
   const [editNotes, setEditNotes] = useState(task.notes || "");
   const [editCategory, setEditCategory] = useState(task.category);
@@ -48,98 +49,70 @@ export default function TaskDetailDrawer({
 
   if (!isOpen) return null;
 
-  // Handle Mark Done (Auto detects Done Late)
-  const handleMarkDone = () => {
+  const handleMarkDone = async () => {
     const now = new Date();
-    const nowStr = now.toISOString();
     let status: Task["status"] = "done";
 
-    // Detect if Done Late
     if (task.plannedTime) {
       try {
         const plannedDateTime = new Date(`${task.plannedDate}T${task.plannedTime}`);
-        if (now > plannedDateTime) {
-          status = "done_late";
-        }
-      } catch (e) {
-        console.error("Error parsing planned date/time", e);
-      }
+        if (now > plannedDateTime) status = "done_late";
+      } catch {}
     }
 
-    updateTask(task.id, {
-      status,
-      completedAt: nowStr
-    });
+    await updateTask(task.id, { status, completedAt: now.toISOString() });
+    addToast(`"${task.title}" completed${status === "done_late" ? " late" : ""}`, "success", 2000);
     onTaskUpdated();
     onClose();
   };
 
-  // Handle Mark Missed
-  const handleMarkMissed = () => {
-    updateTask(task.id, { status: "missed" });
+  const handleMarkMissed = async () => {
+    await updateTask(task.id, { status: "missed" });
+    addToast(`"${task.title}" marked as missed`, "error", 2000);
     onTaskUpdated();
     onClose();
   };
 
-  // Handle Mark Skipped
-  const handleMarkSkippedSubmit = (e: React.FormEvent) => {
+  const handleMarkSkippedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateTask(task.id, { 
+    await updateTask(task.id, {
       status: "skipped",
-      skipReason: skipReason.trim() || undefined
+      skipReason: skipReason.trim() || undefined,
     });
+    addToast(`"${task.title}" skipped`, "info", 2000);
     onTaskUpdated();
     onClose();
   };
 
-  // Delete Task
-  const handleDelete = () => {
-    deleteTask(task.id);
+  const handleDelete = async () => {
+    await deleteTask(task.id);
+    addToast(`"${task.title}" deleted`, "info", 2000);
     onTaskUpdated();
     onClose();
   };
 
-  // Check/uncheck Checklist Item in detail view
-  const handleToggleChecklistItem = (itemId: string, checked: boolean) => {
-    const updatedChecklist = (task.checklist || []).map(item => 
-      item.id === itemId ? { ...item, checked } : item
+  const handleToggleChecklistItem = async (itemId: string, checked: boolean) => {
+    const updatedChecklist = (task.checklist || []).map((item) =>
+      item.id === itemId ? { ...item, checked } : item,
     );
-    updateTask(task.id, { checklist: updatedChecklist });
-    onTaskUpdated();
-    // Update local state as well
+    await updateTask(task.id, { checklist: updatedChecklist });
     setEditChecklist(updatedChecklist);
+    onTaskUpdated();
   };
 
-  // Add Item to Checklist during edit
   const handleAddChecklistItem = (e: React.FormEvent) => {
     e.preventDefault();
     const label = newCheckItem.trim();
     if (!label) return;
-    setEditChecklist([
-      ...editChecklist,
-      { id: generateId(), label, checked: false }
-    ]);
+    setEditChecklist([...editChecklist, { id: generateId(), label, checked: false }]);
     setNewCheckItem("");
   };
 
-  // Remove checklist item during edit
-  const handleRemoveChecklistItem = (itemId: string) => {
-    setEditChecklist(editChecklist.filter(item => item.id !== itemId));
-  };
-
-  // Toggle check/uncheck during edit
-  const handleToggleChecklistEditMode = (itemId: string) => {
-    setEditChecklist(editChecklist.map(item => 
-      item.id === itemId ? { ...item, checked: !item.checked } : item
-    ));
-  };
-
-  // Save Edits
-  const handleSaveEdits = (e: React.FormEvent) => {
+  const handleSaveEdits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTitle.trim()) return;
 
-    updateTask(task.id, {
+    await updateTask(task.id, {
       title: editTitle.trim(),
       notes: editNotes.trim() || undefined,
       category: editCategory,
@@ -152,212 +125,181 @@ export default function TaskDetailDrawer({
     onTaskUpdated();
   };
 
-  const getStatusStyle = (status: Task["status"]) => {
-    switch (status) {
-      case "done":
-        return "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
-      case "done_late":
-        return "bg-amber-500/10 border-amber-500/20 text-amber-400";
-      case "missed":
-        return "bg-rose-500/10 border-rose-500/20 text-rose-400";
-      case "skipped":
-        return "bg-zinc-800 border-zinc-700/60 text-zinc-400";
-      default:
-        return "bg-sky-500/10 border-sky-500/20 text-sky-400";
-    }
-  };
+  const statusStyle = {
+    done: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    done_late: "border-amber-200 bg-amber-50 text-amber-700",
+    missed: "border-rose-200 bg-rose-50 text-rose-700",
+    skipped: "border-slate-200 bg-slate-100 text-slate-600",
+    planned: "border-sky-200 bg-sky-50 text-sky-700",
+  }[task.status];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-slate-950/35 animate-fade-in" onClick={onClose} />
 
-      {/* Panel */}
-      <div className="w-full max-w-md bg-zinc-950 border-t border-white/10 rounded-t-[2.2rem] z-50 p-6 flex flex-col gap-4 shadow-2xl relative max-h-[85vh] overflow-y-auto animate-slide-up">
-        
-        {/* Drag handle decoration */}
-        <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-2 shrink-0"></div>
+      <div className="relative z-50 flex max-h-[86vh] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-t-xl border border-slate-200 bg-white p-5 shadow-2xl animate-slide-up sm:mb-6 sm:rounded-xl">
+        <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/5 pb-3">
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-bold px-2 py-0.5 border rounded-full uppercase tracking-wider ${getStatusStyle(task.status)}`}>
-              {task.status.replace("_", " ")}
-            </span>
-          </div>
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize ${statusStyle}`}>
+            {task.status.replace("_", " ")}
+          </span>
           <div className="flex items-center gap-1.5">
-            {!isEditing && (
-              <button 
+            {!isEditing ? (
+              <button
                 onClick={() => setIsEditing(true)}
-                className="p-2 hover:bg-zinc-900 rounded-lg text-zinc-400 hover:text-white transition-colors"
-                title="Edit Task"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950"
+                title="Edit task"
               >
-                <Edit3 className="w-4 h-4" />
+                <Edit3 className="h-4 w-4" />
               </button>
-            )}
-            <button 
+            ) : null}
+            <button
               onClick={onClose}
-              className="p-2 hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950"
+              title="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* View Mode vs Edit Mode */}
         {!isEditing ? (
-          <div className="flex flex-col gap-4 text-xs">
-            {/* Title & Notes */}
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-black text-white leading-snug">{task.title}</h2>
-              {task.notes && (
-                <p className="text-zinc-400 mt-2 bg-zinc-900/40 border border-white/5 p-3.5 rounded-xl text-[11px] leading-relaxed">
+          <div className="flex flex-col gap-5 text-sm">
+            <div>
+              <h2 className="text-xl font-semibold leading-snug text-slate-950">{task.title}</h2>
+              {task.notes ? (
+                <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
                   {task.notes}
                 </p>
-              )}
+              ) : null}
             </div>
 
-            {/* Date Time Metas */}
-            <div className="flex items-center gap-4 text-zinc-500 py-1 font-semibold text-[11px]">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                <span>{task.plannedDate}</span>
-              </div>
-              {task.plannedTime && (
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-purple-400" />
-                  <span>{task.plannedTime}</span>
-                </div>
-              )}
-              <div className="ml-auto bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wide">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+              <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {task.plannedDate}
+              </span>
+              {task.plannedTime ? (
+                <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  {task.plannedTime}
+                </span>
+              ) : null}
+              <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
                 {task.category}
-              </div>
+              </span>
             </div>
 
-            {/* Checklist Section */}
-            {task.checklist && task.checklist.length > 0 && (
-              <div className="flex flex-col gap-2.5 py-2 border-t border-white/5">
-                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Sub-task Checklist</span>
-                <div className="flex flex-col gap-1.5">
-                  {task.checklist.map((item) => (
-                    <div 
-                      key={item.id}
-                      onClick={() => handleToggleChecklistItem(item.id, !item.checked)}
-                      className="flex items-center gap-2 p-2 bg-zinc-900/20 border border-white/5 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors"
-                    >
-                      {item.checked ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-400 shrink-0" />
-                      ) : (
-                        <Square className="w-4 h-4 text-zinc-600 shrink-0" />
-                      )}
-                      <span className={`text-xs font-medium text-zinc-300 ${item.checked ? "line-through text-zinc-600" : ""}`}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            {task.checklist && task.checklist.length > 0 ? (
+              <div className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+                <span className="text-xs font-semibold text-slate-600">Checklist</span>
+                {task.checklist.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleToggleChecklistItem(item.id, !item.checked)}
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2.5 text-left transition-colors hover:bg-slate-50"
+                  >
+                    {item.checked ? (
+                      <CheckSquare className="h-4 w-4 shrink-0 text-emerald-600" />
+                    ) : (
+                      <Square className="h-4 w-4 shrink-0 text-slate-400" />
+                    )}
+                    <span className={`text-sm ${item.checked ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
               </div>
-            )}
+            ) : null}
 
-            {/* Skip Reason logged if skipped */}
-            {task.status === "skipped" && task.skipReason && (
-              <div className="p-3 bg-zinc-900/60 border border-white/5 rounded-xl flex flex-col gap-1 text-[11px]">
-                <span className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Skip Reason</span>
-                <span className="text-zinc-300 italic">&quot;{task.skipReason}&quot;</span>
+            {task.status === "skipped" && task.skipReason ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                <p className="text-xs font-semibold text-slate-500">Skip reason</p>
+                <p className="mt-1">{task.skipReason}</p>
               </div>
-            )}
+            ) : null}
 
-            {/* Status Actions */}
-            {task.status === "planned" && !showSkipReasonInput && (
-              <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
-                <button 
+            {task.status === "planned" && !showSkipReasonInput ? (
+              <div className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+                <button
                   onClick={handleMarkDone}
-                  className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Mark Completed</span>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Mark completed
                 </button>
-
                 <div className="grid grid-cols-2 gap-2">
-                  <button 
+                  <button
                     onClick={() => setShowSkipReasonInput(true)}
-                    className="bg-zinc-800 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 font-bold py-3 rounded-xl transition-all"
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    Skip Habit
+                    Skip
                   </button>
-                  <button 
+                  <button
                     onClick={handleMarkMissed}
-                    className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-1"
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 font-semibold text-rose-700 transition-colors hover:bg-rose-100"
                   >
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Mark Missed</span>
+                    <AlertCircle className="h-4 w-4" />
+                    Missed
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Skip Reason Input Section */}
-            {showSkipReasonInput && (
-              <form onSubmit={handleMarkSkippedSubmit} className="flex flex-col gap-3 pt-3 border-t border-white/5 animate-fade-in">
-                <div className="flex flex-col gap-1">
-                  <label className="text-zinc-500 font-bold uppercase tracking-wider text-[9px]">Reason for skipping</label>
-                  <input 
-                    type="text"
-                    placeholder="E.g., feeling sick, low battery, out of town..."
-                    value={skipReason}
-                    onChange={(e) => setSkipReason(e.target.value)}
-                    className="glass-input text-xs px-3 py-2.5 text-white"
-                    required
-                    autoFocus
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button 
+            {showSkipReasonInput ? (
+              <form onSubmit={handleMarkSkippedSubmit} className="flex flex-col gap-3 border-t border-slate-200 pt-4">
+                <label className="text-xs font-semibold text-slate-600">Reason for skipping</label>
+                <input
+                  type="text"
+                  placeholder="Optional context"
+                  value={skipReason}
+                  onChange={(e) => setSkipReason(e.target.value)}
+                  className="glass-input px-3 py-2.5 text-sm"
+                  autoFocus
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
                     type="button"
                     onClick={() => setShowSkipReasonInput(false)}
-                    className="flex-1 bg-zinc-800 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 py-2.5 rounded-xl font-semibold"
+                    className="rounded-lg border border-slate-200 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     type="submit"
-                    className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1"
+                    className="rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white hover:bg-slate-800"
                   >
-                    <span>Confirm Skip</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    Confirm skip
                   </button>
                 </div>
               </form>
-            )}
+            ) : null}
 
-            {/* Delete button (with confirm toggle) */}
             {!confirmDelete ? (
-              <button 
+              <button
                 onClick={() => setConfirmDelete(true)}
-                className="w-full mt-4 text-zinc-600 hover:text-rose-400/80 py-2 rounded-xl text-center text-[10px] font-bold border border-transparent hover:border-rose-500/10 transition-all flex items-center justify-center gap-1"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent py-2.5 text-xs font-semibold text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Task</span>
+                <Trash2 className="h-4 w-4" />
+                Delete task
               </button>
             ) : (
-              <div className="mt-4 p-3 bg-rose-500/5 border border-rose-500/15 rounded-xl flex items-center justify-between text-[11px] animate-fade-in">
-                <div className="flex items-center gap-1.5 text-rose-300 font-bold">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>Permanently delete?</span>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-rose-700">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Delete permanently?
                 </div>
-                <div className="flex gap-1.5">
-                  <button 
+                <div className="flex gap-2">
+                  <button
                     onClick={() => setConfirmDelete(false)}
-                    className="bg-zinc-800 text-zinc-400 px-3 py-1.5 rounded-lg font-semibold"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleDelete}
-                    className="bg-rose-500 text-white px-3.5 py-1.5 rounded-lg font-bold"
+                    className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
                   >
                     Delete
                   </button>
@@ -366,137 +308,135 @@ export default function TaskDetailDrawer({
             )}
           </div>
         ) : (
-          /* Inline Edit Form */
-          <form onSubmit={handleSaveEdits} className="flex flex-col gap-4 text-xs">
-            {/* Title */}
+          <form onSubmit={handleSaveEdits} className="flex flex-col gap-4 text-sm">
             <div className="flex flex-col gap-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Task Title</label>
-              <input 
-                type="text" 
+              <label className="text-xs font-semibold text-slate-600">Task title</label>
+              <input
+                type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="glass-input text-xs px-3.5 py-2.5 text-white"
+                className="glass-input px-3.5 py-2.5 text-sm"
                 required
               />
             </div>
 
-            {/* Date & Time */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Date</label>
-                <input 
+                <label className="text-xs font-semibold text-slate-600">Date</label>
+                <input
                   type="date"
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
-                  className="bg-zinc-900 border border-white/5 rounded-xl px-2.5 py-2 text-white text-[11px] focus:outline-none"
+                  className="glass-input px-3 py-2.5 text-sm"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Time</label>
-                <input 
+                <label className="text-xs font-semibold text-slate-600">Time</label>
+                <input
                   type="time"
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
-                  className="bg-zinc-900 border border-white/5 rounded-xl px-2.5 py-2 text-white text-[11px] focus:outline-none"
+                  className="glass-input px-3 py-2.5 text-sm"
                 />
               </div>
             </div>
 
-            {/* Category */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Category</label>
+              <label className="text-xs font-semibold text-slate-600">Category</label>
               <select
                 value={editCategory}
                 onChange={(e) => setEditCategory(e.target.value)}
-                className="bg-zinc-900 border border-white/5 rounded-xl px-2.5 py-2 text-white focus:outline-none"
+                className="glass-input px-3 py-2.5 text-sm font-medium"
               >
                 {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Notes */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Notes</label>
-              <textarea 
+              <label className="text-xs font-semibold text-slate-600">Notes</label>
+              <textarea
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
-                rows={2}
-                className="glass-input text-xs px-3.5 py-2 text-white resize-none"
+                rows={3}
+                className="glass-input resize-none px-3.5 py-2.5 text-sm"
               />
             </div>
 
-            {/* Checklist Edit */}
-            <div className="flex flex-col gap-2 py-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Sub-tasks checklist</label>
-              
-              {/* Existing items */}
-              {editChecklist.length > 0 && (
-                <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-slate-600">Checklist</label>
+              {editChecklist.length > 0 ? (
+                <div className="flex max-h-36 flex-col gap-1.5 overflow-y-auto">
                   {editChecklist.map((item) => (
-                    <div 
-                      key={item.id}
-                      className="flex items-center justify-between p-2 bg-zinc-900/40 border border-white/5 rounded-xl"
-                    >
-                      <div 
-                        onClick={() => handleToggleChecklistEditMode(item.id)}
-                        className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditChecklist((current) =>
+                            current.map((entry) =>
+                              entry.id === item.id ? { ...entry, checked: !entry.checked } : entry,
+                            ),
+                          )
+                        }
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         {item.checked ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <CheckSquare className="h-4 w-4 shrink-0 text-emerald-600" />
                         ) : (
-                          <Square className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                          <Square className="h-4 w-4 shrink-0 text-slate-400" />
                         )}
-                        <span className={`text-[11px] truncate text-zinc-300 ${item.checked ? "line-through opacity-40" : ""}`}>
+                        <span className={`truncate text-sm ${item.checked ? "text-slate-400 line-through" : "text-slate-700"}`}>
                           {item.label}
                         </span>
-                      </div>
-                      <button 
+                      </button>
+                      <button
                         type="button"
-                        onClick={() => handleRemoveChecklistItem(item.id)}
-                        className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"
+                        onClick={() => setEditChecklist((current) => current.filter((entry) => entry.id !== item.id))}
+                        className="rounded-md p-1 text-slate-400 hover:bg-white hover:text-rose-600"
+                        title="Remove checklist item"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
 
-              {/* Add checklist item */}
-              <div className="flex gap-1.5 mt-1">
-                <input 
-                  type="text" 
-                  placeholder="Add item..." 
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add checklist item"
                   value={newCheckItem}
                   onChange={(e) => setNewCheckItem(e.target.value)}
-                  className="flex-1 bg-zinc-900 border border-white/5 rounded-xl px-2.5 py-1.5 text-white placeholder:text-zinc-700 text-[11px]"
+                  className="glass-input min-w-0 flex-1 px-3 py-2 text-sm"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={handleAddChecklistItem}
-                  className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/80 px-3 rounded-xl text-zinc-300 font-bold"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+                  title="Add checklist item"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            {/* Edit Actions */}
-            <div className="flex gap-2 pt-2">
-              <button 
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="flex-1 bg-zinc-850 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 py-2.5 rounded-xl font-semibold"
+                className="rounded-lg border border-slate-200 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 type="submit"
-                className="flex-1 bg-purple-500 hover:bg-purple-400 text-black py-2.5 rounded-xl font-bold"
+                className="rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white hover:bg-slate-800"
               >
-                Save Changes
+                Save changes
               </button>
             </div>
           </form>

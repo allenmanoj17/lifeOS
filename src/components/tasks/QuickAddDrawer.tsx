@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Calendar, Clock, Plus, Repeat } from "lucide-react";
-import { getCategories, createTask, formatDateString } from "@/app/trackdaily/db";
+import { Calendar, Clock, Plus, Repeat, X } from "lucide-react";
+import { formatDateString, getCategories } from "@/app/trackdaily/db";
 import { RecurringRule } from "@/app/trackdaily/types";
+import { useToast } from "@/components/Toast";
+import { useTrackDailyContext } from "@/context/TrackDailyContext";
 
 interface QuickAddDrawerProps {
   isOpen: boolean;
@@ -18,38 +20,37 @@ export default function QuickAddDrawer({
   onTaskAdded,
   prefilledDate,
 }: QuickAddDrawerProps) {
+  const { addToast } = useToast();
+  const { createTask } = useTrackDailyContext();
   const [categories] = useState<string[]>(() => getCategories());
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState(() => getCategories()[0] || "Other");
   const [plannedDate, setPlannedDate] = useState(() => prefilledDate || formatDateString(new Date()));
   const [plannedTime, setPlannedTime] = useState("");
-  
-  // Recurring state
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]); // 0=Sun, 1=Mon...
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
   const [recurringEndDate, setRecurringEndDate] = useState("");
   const [error, setError] = useState("");
 
   if (!isOpen) return null;
 
   const toggleDayOfWeek = (day: number) => {
-    if (daysOfWeek.includes(day)) {
-      setDaysOfWeek(daysOfWeek.filter(d => d !== day));
-    } else {
-      setDaysOfWeek([...daysOfWeek, day]);
-    }
+    setDaysOfWeek((current) =>
+      current.includes(day) ? current.filter((value) => value !== day) : [...current, day],
+    );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       setError("Task title is required");
+      addToast("Task title is required", "error", 2000);
       return;
     }
 
-    let recurringRule: RecurringRule | undefined = undefined;
+    let recurringRule: RecurringRule | undefined;
     if (isRecurring) {
       recurringRule = {
         frequency,
@@ -58,7 +59,7 @@ export default function QuickAddDrawer({
       };
     }
 
-    createTask({
+    await createTask({
       title: title.trim(),
       notes: notes.trim() || undefined,
       category,
@@ -69,6 +70,10 @@ export default function QuickAddDrawer({
       recurringRule,
     });
 
+    const timeStr = plannedTime ? ` at ${plannedTime}` : "";
+    const recurringStr = isRecurring ? " (recurring)" : "";
+    addToast(`Task "${title.trim()}" added${timeStr}${recurringStr}`, "success", 2500);
+
     onTaskAdded();
     onClose();
   };
@@ -77,139 +82,126 @@ export default function QuickAddDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-slate-950/35 animate-fade-in" onClick={onClose} />
 
-      {/* Drawer Panel */}
-      <div className="w-full max-w-md bg-zinc-950 border-t border-white/10 rounded-t-[2rem] z-50 p-6 flex flex-col gap-4 shadow-2xl relative max-h-[85vh] overflow-y-auto animate-slide-up">
-        {/* Drag handle decoration */}
-        <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-2 shrink-0"></div>
+      <div className="relative z-50 flex max-h-[86vh] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-t-xl border border-slate-200 bg-white p-5 shadow-2xl animate-slide-up sm:mb-6 sm:rounded-xl">
+        <div className="mx-auto h-1 w-10 rounded-full bg-slate-200" />
 
-        {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-white flex items-center gap-1.5">
-            <Plus className="w-4 h-4 text-purple-400" />
-            <span>Add Daily Task</span>
-          </h3>
-          <button 
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">New task</p>
+            <h3 className="text-lg font-semibold text-slate-950">Add to schedule</h3>
+          </div>
+          <button
             onClick={onClose}
-            className="p-1 hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-950"
+            title="Close"
           >
-            <X className="w-4.5 h-4.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Error message */}
-        {error && (
-          <p className="text-xs text-rose-400 font-bold bg-rose-500/10 px-3 py-2 rounded-lg">{error}</p>
-        )}
+        {error ? (
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+            {error}
+          </p>
+        ) : null}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-xs">
-          {/* Title */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-sm">
           <div className="flex flex-col gap-1.5">
-            <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Task Title</label>
-            <input 
-              type="text" 
-              placeholder="E.g., Read documentation, gym sessions..."
+            <label className="text-xs font-semibold text-slate-600">Task title</label>
+            <input
+              type="text"
+              placeholder="What needs to get done?"
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
                 setError("");
               }}
-              className="glass-input text-xs px-3.5 py-3 text-white placeholder:text-zinc-600 w-full"
+              className="glass-input w-full px-3.5 py-3 text-sm placeholder:text-slate-400"
               autoFocus
             />
           </div>
 
-          {/* Date & Time */}
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-purple-400" />
-                <span>Planned Date</span>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                Date
               </label>
-              <input 
+              <input
                 type="date"
                 value={plannedDate}
                 onChange={(e) => setPlannedDate(e.target.value)}
-                className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
+                className="glass-input px-3 py-2.5 text-sm"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
-                <Clock className="w-3 h-3 text-purple-400" />
-                <span>Planned Time</span>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                <Clock className="h-3.5 w-3.5 text-slate-500" />
+                Time
               </label>
-              <input 
+              <input
                 type="time"
                 value={plannedTime}
                 onChange={(e) => setPlannedTime(e.target.value)}
-                className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500/50"
+                className="glass-input px-3 py-2.5 text-sm"
               />
             </div>
           </div>
 
-          {/* Category */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Category</label>
+            <label className="text-xs font-semibold text-slate-600">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="bg-zinc-900 border border-white/5 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500/50 cursor-pointer font-semibold"
+              className="glass-input px-3 py-2.5 text-sm font-medium"
             >
               {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Notes */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Notes</label>
-            <textarea 
-              placeholder="Additional details (optional)..."
+            <label className="text-xs font-semibold text-slate-600">Notes</label>
+            <textarea
+              placeholder="Optional details"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="glass-input text-xs px-3.5 py-2.5 text-white placeholder:text-zinc-600 w-full resize-none"
+              rows={3}
+              className="glass-input w-full resize-none px-3.5 py-2.5 text-sm placeholder:text-slate-400"
             />
           </div>
 
-          {/* Recurring Toggle */}
-          <div className="pt-2 border-t border-white/5 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Repeat className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="text-zinc-300 font-medium">Is this a recurring habit?</span>
-              </div>
-              <input 
-                type="checkbox" 
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <Repeat className="h-4 w-4 text-slate-500" />
+                Recurring task
+              </span>
+              <input
+                type="checkbox"
                 checked={isRecurring}
                 onChange={(e) => setIsRecurring(e.target.checked)}
-                className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
+                className="h-4 w-4 accent-sky-700"
               />
-            </div>
+            </label>
 
-            {/* Recurring Rule Panel */}
-            {isRecurring && (
-              <div className="p-3 bg-zinc-900/40 border border-white/5 rounded-xl flex flex-col gap-3.5 animate-fade-in">
-                {/* Frequency */}
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Frequency</span>
-                  <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-white/5">
+            {isRecurring ? (
+              <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-slate-600">Frequency</span>
+                  <div className="flex rounded-lg border border-slate-200 bg-white p-1">
                     {(["daily", "weekly", "monthly"] as const).map((freq) => (
                       <button
                         key={freq}
                         type="button"
                         onClick={() => setFrequency(freq)}
-                        className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-md transition-colors ${
-                          frequency === freq 
-                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/25" 
-                            : "text-zinc-500 hover:text-zinc-300"
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold capitalize transition-colors ${
+                          frequency === freq ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
                         }`}
                       >
                         {freq}
@@ -218,22 +210,19 @@ export default function QuickAddDrawer({
                   </div>
                 </div>
 
-                {/* Days of Week (Weekly only) */}
-                {frequency === "weekly" && (
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Repeat On</span>
-                    <div className="flex justify-between">
+                {frequency === "weekly" ? (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-slate-600">Repeat on</span>
+                    <div className="flex justify-between gap-1.5">
                       {daysLabel.map((label, idx) => {
                         const active = daysOfWeek.includes(idx);
                         return (
                           <button
-                            key={idx}
+                            key={`${label}-${idx}`}
                             type="button"
                             onClick={() => toggleDayOfWeek(idx)}
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center font-black transition-all text-[10px] ${
-                              active 
-                                ? "bg-purple-500 text-black shadow-md shadow-purple-500/10" 
-                                : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                            className={`h-8 flex-1 rounded-lg text-xs font-semibold transition-colors ${
+                              active ? "bg-sky-700 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
                             }`}
                           >
                             {label}
@@ -242,28 +231,27 @@ export default function QuickAddDrawer({
                       })}
                     </div>
                   </div>
-                )}
+                ) : null}
 
-                {/* End Date */}
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">End Date (optional)</span>
-                  <input 
+                <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-600">End date</span>
+                  <input
                     type="date"
                     value={recurringEndDate}
                     onChange={(e) => setRecurringEndDate(e.target.value)}
-                    className="bg-zinc-900 border border-white/5 rounded-lg px-2.5 py-1 text-white text-[11px] focus:outline-none focus:border-purple-500"
+                    className="glass-input px-2.5 py-1.5 text-xs"
                   />
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* Submit */}
-          <button 
+          <button
             type="submit"
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all text-xs tracking-wide uppercase mt-2"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 active:bg-slate-950"
           >
-            Create Task
+            <Plus className="h-4 w-4" />
+            Create task
           </button>
         </form>
       </div>

@@ -1,15 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
 import PwaRegistry from "@/components/PwaRegistry";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { TrackDailyProvider } from "@/context/TrackDailyContext";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
-
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-});
 
 export const metadata: Metadata = {
   title: "LifeOS",
@@ -26,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#f6f7f9",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -38,15 +32,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const serverMissingEnv = !process.env.CLERK_JWT_ISSUER_DOMAIN
+    ? ["CLERK_JWT_ISSUER_DOMAIN"]
+    : [];
+
   return (
-    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
-      <body className="font-jakarta min-h-full flex flex-col selection:bg-purple-500/30 selection:text-purple-200">
+    <html lang="en" className="h-full antialiased">
+      <body className="font-jakarta min-h-full flex flex-col selection:bg-sky-200 selection:text-slate-950">
         <PwaRegistry />
-        <ConvexClientProvider>
+        <ConvexClientProvider serverMissingEnv={serverMissingEnv}>
           <TrackDailyProvider>
-            <main className="flex-1 flex flex-col max-w-md w-full mx-auto relative px-4 md:px-0">
-              {children}
-            </main>
+            <ToastProvider>{children}</ToastProvider>
           </TrackDailyProvider>
         </ConvexClientProvider>
       </body>

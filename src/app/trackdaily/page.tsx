@@ -1,59 +1,82 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, 
   CheckCircle2, 
   Circle, 
   Clock, 
-  Sparkles, 
   ChevronLeft,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  Lightbulb
 } from "lucide-react";
 import { formatDateString } from "./db";
 import { Task } from "./types";
 import { useTrackDailyContext } from "@/context/TrackDailyContext";
 import QuickAddDrawer from "@/components/tasks/QuickAddDrawer";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
+import { useToast } from "@/components/Toast";
 
 export default function TodayPage() {
-  const [selectedDateStr, setSelectedDateStr] = useState("");
+  const [selectedDateStr, setSelectedDateStr] = useState(() => formatDateString(new Date()));
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { addToast } = useToast();
   
-  // Date nav array
-  const [dateList, setDateList] = useState<{ dateStr: string; dayName: string; dayNum: number }[]>([]);
-
   // Use the shared context
-  const { allTasks, isLoading, updateTask, refresh } = useTrackDailyContext();
+  const { allTasks, updateTask, refresh } = useTrackDailyContext();
   const tasks = allTasks.filter(t => t.plannedDate === selectedDateStr);
-
-  useEffect(() => {
-    // Set default date to today on mount
-    const today = new Date();
-    const todayStr = formatDateString(today);
-    setSelectedDateStr(todayStr);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDateStr) return;
-
-    // Generate 5-day array around selected date
-    const centerDate = new Date(selectedDateStr + "T12:00:00"); // avoid timezone shifting
-    const list = [];
-    for (let i = -2; i <= 2; i++) {
+  const todayDateStr = formatDateString(new Date());
+  const dateList = useMemo(() => {
+    const centerDate = new Date(`${selectedDateStr}T12:00:00`);
+    return Array.from({ length: 5 }, (_, index) => {
       const d = new Date(centerDate);
-      d.setDate(centerDate.getDate() + i);
-      const dateStr = formatDateString(d);
-      
-      const dayName = d.toLocaleDateString([], { weekday: 'narrow' }); // M, T, W...
-      const dayNum = d.getDate();
-      list.push({ dateStr, dayName, dayNum });
-    }
-    setDateList(list);
+      d.setDate(centerDate.getDate() + index - 2);
+      return {
+        dateStr: formatDateString(d),
+        dayName: d.toLocaleDateString([], { weekday: "narrow" }),
+        dayNum: d.getDate(),
+      };
+    });
   }, [selectedDateStr]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K to open quick add
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsQuickAddOpen(true);
+        addToast("Quick Add opened", "info", 1500);
+      }
+      
+      // Left arrow to go to previous day
+      if (e.key === "ArrowLeft" && !isQuickAddOpen && !isDetailOpen) {
+        const d = new Date(selectedDateStr + "T12:00:00");
+        d.setDate(d.getDate() - 1);
+        setSelectedDateStr(formatDateString(d));
+      }
+      
+      // Right arrow to go to next day
+      if (e.key === "ArrowRight" && !isQuickAddOpen && !isDetailOpen) {
+        const d = new Date(selectedDateStr + "T12:00:00");
+        d.setDate(d.getDate() + 1);
+        setSelectedDateStr(formatDateString(d));
+      }
+      
+      // Escape to close drawers
+      if (e.key === "Escape") {
+        setIsQuickAddOpen(false);
+        setIsDetailOpen(false);
+        setSelectedTask(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [selectedDateStr, isQuickAddOpen, isDetailOpen, addToast]);
 
   const triggerRefresh = () => {
     refresh();
@@ -82,6 +105,7 @@ export default function TodayPage() {
     if (task.status === "done" || task.status === "done_late") {
       // Toggle back to planned
       await updateTask(task.id, { status: "planned", completedAt: undefined });
+      addToast(`"${task.title}" marked as planned`, "info", 2000);
     } else {
       // Mark done (check late)
       const now = new Date();
@@ -92,9 +116,13 @@ export default function TodayPage() {
           if (now > plannedDateTime) {
             status = "done_late";
           }
-        } catch (err) {}
+        } catch {}
       }
       await updateTask(task.id, { status, completedAt: now.toISOString() });
+      const message = status === "done_late" 
+        ? `✓ "${task.title}" completed (late)` 
+        : `✓ "${task.title}" completed`;
+      addToast(message, "success", 2000);
     }
   };
 
@@ -148,40 +176,30 @@ export default function TodayPage() {
 
   // Formatting date for header
   const headerDateLabel = selectedDateStr ? new Date(selectedDateStr + "T12:00:00").toLocaleDateString([], { 
-    month: 'long', 
-    day: 'numeric', 
-    year: 'numeric' 
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   }) : "";
 
   return (
     <div className="flex flex-col gap-6 select-none animate-fade-in relative">
       
-      {/* Daily Progress Widget - Light Cognitive Panel */}
-      <div className="glass-panel p-5 rounded-2xl border border-indigo-500/10 flex items-center justify-between shadow-sm relative overflow-hidden scanline">
-        <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
-        
+      {/* Daily Progress */}
+      <div className="glass-panel flex items-center justify-between p-5">
         <div className="flex flex-col gap-1">
-          <span className="text-[9px] text-indigo-600 font-bold uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-            Sync Core Status
+          <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Today
           </span>
-          <span className="text-2xl font-black text-slate-800 tracking-tight mt-1">
-            {completedCount} <span className="text-slate-500 text-sm font-medium">/ {tasks.length} Done</span>
+          <span className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+            {completedCount} <span className="text-sm font-medium text-slate-500">/ {tasks.length} done</span>
           </span>
-          <span className="text-xs text-slate-500 font-semibold mt-1">
-            {tasks.length > 0 ? `${progressPercent}% of nodes processed` : "Zero nodes committed"}
+          <span className="mt-1 text-sm font-medium text-slate-500">
+            {tasks.length > 0 ? `${progressPercent}% complete` : "No tasks planned"}
           </span>
         </div>
 
-        {/* Circular progress loader in light mode */}
         <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
           <svg className="w-full h-full transform -rotate-90">
-            <defs>
-              <linearGradient id="lightCyberGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#6366f1" />
-                <stop offset="100%" stopColor="#06b6d4" />
-              </linearGradient>
-            </defs>
             <circle 
               cx="32" cy="32" r="26" 
               className="stroke-slate-100" 
@@ -190,7 +208,7 @@ export default function TodayPage() {
             />
             <circle 
               cx="32" cy="32" r="26" 
-              stroke="url(#lightCyberGradient)" 
+              stroke="#0284c7" 
               strokeWidth="4.5" 
               fill="transparent" 
               strokeDasharray={163.36}
@@ -199,7 +217,7 @@ export default function TodayPage() {
               className="transition-all duration-700 ease-out"
             />
           </svg>
-          <span className="absolute text-[11px] font-black text-slate-800 font-mono tracking-tighter">
+          <span className="absolute text-[11px] font-semibold text-slate-800">
             {progressPercent}%
           </span>
         </div>
@@ -209,7 +227,7 @@ export default function TodayPage() {
       <div className="flex items-center justify-between px-1">
         <button 
           onClick={handlePrevDay}
-          className="p-2 bg-white/70 hover:bg-slate-100 border border-slate-200/60 rounded-xl text-slate-500 hover:text-slate-800 transition-all shrink-0 shadow-sm"
+          className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors shrink-0"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -217,15 +235,15 @@ export default function TodayPage() {
         <div className="flex justify-between flex-1 px-3 gap-2">
           {dateList.map(({ dateStr, dayName, dayNum }) => {
             const isSelected = dateStr === selectedDateStr;
-            const isToday = dateStr === formatDateString(new Date());
+            const isToday = dateStr === todayDateStr;
             
             return (
               <button
                 key={dateStr}
                 onClick={() => handleDaySelect(dateStr)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 min-w-10 flex-1 relative ${
+                className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-10 flex-1 relative ${
                   isSelected 
-                    ? "bg-gradient-to-br from-indigo-500 to-indigo-650 text-white font-bold shadow-md shadow-indigo-500/10 scale-105 border border-indigo-400/20" 
+                    ? "bg-slate-900 text-white font-bold border border-slate-900" 
                     : "text-slate-500 hover:bg-white/80 border border-transparent"
                 }`}
               >
@@ -236,15 +254,11 @@ export default function TodayPage() {
                   isSelected 
                     ? "bg-white/20" 
                     : isToday 
-                      ? "border border-indigo-500/30 text-indigo-600 font-bold bg-indigo-500/5" 
+                      ? "border border-sky-500/30 text-sky-600 font-bold bg-sky-500/5" 
                       : ""
                 }`}>
                   {dayNum}
                 </span>
-                {/* Active indicator dot */}
-                {isSelected && (
-                  <span className="absolute -bottom-1 w-1.5 h-1.5 bg-sky-400 rounded-full"></span>
-                )}
               </button>
             );
           })}
@@ -252,7 +266,7 @@ export default function TodayPage() {
 
         <button 
           onClick={handleNextDay}
-          className="p-2 bg-white/70 hover:bg-slate-100 border border-slate-200/60 rounded-xl text-slate-500 hover:text-slate-800 transition-all shrink-0 shadow-sm"
+          className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors shrink-0"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -260,8 +274,8 @@ export default function TodayPage() {
 
       {/* Header date info label */}
       <div className="px-1 -mb-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-          // {headerDateLabel}
+        <h2 className="text-xs font-semibold text-slate-500">
+          {headerDateLabel}
         </h2>
       </div>
 
@@ -274,8 +288,7 @@ export default function TodayPage() {
 
             return (
               <div key={block} className="flex flex-col gap-3">
-                <span className="text-[9px] font-bold tracking-widest text-indigo-500/70 uppercase px-1 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-indigo-500/40 rounded-full"></span>
+                <span className="text-xs font-semibold text-slate-500 px-1 flex items-center gap-1.5">
                   {block} ({blockTasks.length})
                 </span>
                 
@@ -290,57 +303,63 @@ export default function TodayPage() {
                       <div
                         key={task.id}
                         onClick={() => handleTaskClick(task)}
-                        className={`glass-card p-4 rounded-2xl flex items-center justify-between border cursor-pointer transition-all duration-300 relative overflow-hidden ${
+                        className={`glass-card relative flex cursor-pointer flex-col gap-3 overflow-hidden border p-4 sm:flex-row sm:items-center sm:justify-between ${
                           isDone 
                             ? "bg-emerald-500/5 border-emerald-500/20 shadow-none opacity-85" 
                             : isMissed 
                               ? "bg-rose-500/5 border-rose-500/20" 
                               : isSkipped 
                                 ? "bg-slate-100/80 border-slate-200/50 opacity-60"
-                                : "border-slate-200/40 hover:border-indigo-500/20 shadow-sm"
+                                : "border-slate-200/40 hover:border-sky-500/20 shadow-sm"
                         }`}
                       >
                         {/* Status sidebars in light mode */}
-                        {isDone && <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>}
-                        {isMissed && <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500"></div>}
-                        {isSkipped && <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-450"></div>}
+                        {isDone && <div className="absolute bottom-0 left-0 top-0 w-1 bg-emerald-500"></div>}
+                        {isMissed && <div className="absolute bottom-0 left-0 top-0 w-1 bg-rose-500"></div>}
+                        {isSkipped && <div className="absolute bottom-0 left-0 top-0 w-1 bg-slate-400"></div>}
 
-                        <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="flex min-w-0 items-center gap-3.5">
                           {/* Checked Checkbox click triggers quick check done */}
                           <div 
                             onClick={(e) => handleQuickComplete(e, task)}
-                            className="p-1 hover:bg-slate-100 rounded-lg transition-colors shrink-0 cursor-pointer"
+                            className="shrink-0 cursor-pointer rounded-lg p-1 transition-colors hover:bg-slate-100"
                           >
                             {isDone ? (
-                              <CheckCircle2 className="w-5.5 h-5.5 text-emerald-550" />
+                              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                             ) : isMissed ? (
-                              <Circle className="w-5.5 h-5.5 text-rose-500 fill-rose-500/5" />
+                              <Circle className="h-5 w-5 fill-rose-500/5 text-rose-500" />
                             ) : isSkipped ? (
-                              <Circle className="w-5.5 h-5.5 text-slate-400 fill-slate-300/10" />
+                              <Circle className="h-5 w-5 fill-slate-300/10 text-slate-400" />
                             ) : (
-                              <Circle className="w-5.5 h-5.5 text-slate-350 hover:text-indigo-650 transition-colors" />
+                              <Circle className="h-5 w-5 text-slate-400 transition-colors hover:text-sky-500" />
                             )}
                           </div>
 
-                          <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex min-w-0 flex-col gap-1">
                             <span className={`text-xs font-bold leading-normal truncate ${
-                              isDone ? "line-through text-slate-450 font-normal" : "text-slate-800"
+                              isDone ? "font-normal text-slate-500 line-through" : "text-slate-800"
                             }`}>
                               {task.title}
                             </span>
                             {task.notes ? (
-                              <span className="text-[10px] text-slate-500 truncate max-w-[200px]">
+                              <span className="max-w-full truncate text-[10px] text-slate-500 sm:max-w-[260px]">
                                 {task.notes}
                               </span>
                             ) : null}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2.5 pl-8 sm:justify-end sm:pl-0">
                           {task.plannedTime && (
-                            <div className="flex items-center gap-1 text-[9px] text-slate-650 font-bold bg-slate-100 px-2 py-1 rounded-lg border border-slate-200/50 font-mono">
-                              <Clock className="w-3 h-3 text-indigo-500" />
+                            <div className="flex items-center gap-1 rounded-lg border border-slate-200/50 bg-slate-100 px-2 py-1 font-mono text-[9px] font-bold text-slate-600">
+                              <Clock className="w-3 h-3 text-sky-500" />
                               <span>{task.plannedTime}</span>
+                            </div>
+                          )}
+                          {task.isRecurring && (
+                            <div className="flex items-center gap-1 text-[8px] text-sky-700 font-bold bg-sky-50 px-2 py-1 rounded-lg border border-sky-200 whitespace-nowrap" title={`Repeats ${task.recurringRule?.frequency || "daily"}`}>
+                              <span>🔄</span>
+                              <span className="uppercase tracking-wider">{task.recurringRule?.frequency || "Daily"}</span>
                             </div>
                           )}
                           <span className={`text-[9px] uppercase font-black tracking-widest px-2 py-1 rounded-md border ${
@@ -352,7 +371,7 @@ export default function TodayPage() {
                                 ? "bg-rose-500/10 border-rose-500/20 text-rose-700"
                                 : isSkipped
                                   ? "bg-slate-200/40 border-slate-300/35 text-slate-500"
-                                  : "bg-indigo-500/10 border-indigo-500/20 text-indigo-600"
+                                  : "bg-sky-500/10 border-sky-500/20 text-sky-600"
                           }`}>
                             {isDoneLate ? "LATE" : task.category}
                           </span>
@@ -365,13 +384,34 @@ export default function TodayPage() {
             );
           })
         ) : (
-          /* Empty State - Light Clean design */
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white/40 border border-dashed border-slate-200/80 rounded-3xl p-6 relative overflow-hidden scanline">
-            <ClipboardList className="w-12 h-12 text-slate-200 mb-4" />
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Empty Planning Cortex</h3>
-            <p className="text-[10px] text-slate-400 mt-2 max-w-[200px] leading-normal font-semibold">
-              No tasks planned for this timestamp. Initialize new node by clicking the anchor below.
+          /* Empty State - Light Clean design with suggestions */
+          <div className="flex flex-col items-center justify-center py-16 text-center bg-white border border-dashed border-slate-300 rounded-lg p-8 relative overflow-hidden">
+            <ClipboardList className="w-14 h-14 text-sky-300 mb-5 relative z-10" />
+            <h3 className="text-sm font-semibold text-slate-800 relative z-10">
+              Day is clear for planning
+            </h3>
+            <p className="text-sm text-slate-500 mt-3 max-w-[280px] leading-relaxed relative z-10">
+              No tasks scheduled for this day. Add focus items or plan ahead.
             </p>
+            
+            {/* Quick action suggestions */}
+            <div className="mt-6 flex flex-col gap-2.5 w-full max-w-xs relative z-10">
+              <button
+                onClick={() => setIsQuickAddOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors active:bg-slate-950"
+              >
+                <Plus className="w-4 h-4" />
+                Add Task (⌘K)
+              </button>
+              
+              {/* Suggestion prompts */}
+              <div className="text-[9px] text-slate-400 mt-2 space-y-1.5">
+                <div className="flex items-center gap-2 justify-center opacity-70 hover:opacity-100 transition">
+                  <Lightbulb className="w-3 h-3 text-amber-500" />
+                  <span>Tip: Use arrow keys to browse other days</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -379,10 +419,13 @@ export default function TodayPage() {
       {/* Floating Action Button (FAB) for Quick Add in light mode */}
       <button 
         onClick={() => setIsQuickAddOpen(true)}
-        className="fixed bottom-24 right-6 w-13 h-13 bg-gradient-to-r from-indigo-500 via-indigo-650 to-sky-500 text-white rounded-full flex items-center justify-center shadow-[0_4px_15px_rgba(99,102,241,0.25)] hover:scale-105 active:scale-95 transition-all z-40 border border-indigo-400/20 cursor-pointer"
-        title="Initialize Task Module"
+        className="group fixed bottom-24 right-6 z-40 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-slate-900 text-white shadow-lg transition-colors hover:bg-slate-800 active:bg-slate-950 sm:bottom-6"
+        title="Add Task — Press ⌘K"
       >
-        <Plus className="w-6 h-6 text-white" />
+        <Plus className="w-6 h-6 text-white group-hover:rotate-90 transition-transform duration-300" />
+        <div className="absolute bottom-full mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-[9px] font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          Add Task (⌘K)
+        </div>
       </button>
 
       {/* Drawers */}

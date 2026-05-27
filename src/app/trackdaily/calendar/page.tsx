@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { 
   CalendarRange, 
-  Clock, 
   AlertTriangle, 
   Check, 
   Sparkles,
@@ -33,8 +32,8 @@ const MOCK_GCAL_EVENTS: { [dayOfWeek: number]: GCalEvent[] } = {
     { id: "gc-4", title: "System Arch Sync", startTime: "15:30", endTime: "17:00", color: "#0ea5e9" }
   ],
   3: [ // Wednesday
-    { id: "gc-5", title: "Digital Mainframe Upgrade", startTime: "09:30", endTime: "11:30", color: "#0ea5e9" },
-    { id: "gc-6", title: "EOD Performance Alignment", startTime: "16:00", endTime: "17:30", color: "#0ea5e9" }
+    { id: "gc-5", title: "Project planning", startTime: "09:30", endTime: "11:30", color: "#0ea5e9" },
+    { id: "gc-6", title: "Daily review", startTime: "16:00", endTime: "17:30", color: "#0ea5e9" }
   ],
   4: [ // Thursday
     { id: "gc-7", title: "Team Retro", startTime: "11:00", endTime: "12:30", color: "#0ea5e9" },
@@ -55,40 +54,30 @@ const MOCK_GCAL_EVENTS: { [dayOfWeek: number]: GCalEvent[] } = {
 export default function CalendarPage() {
   const { allTasks } = useTrackDailyContext();
   
-  const [selectedDate, setSelectedDate] = useState("");
-  const [weekDays, setWeekDays] = useState<{ dateStr: string; dayName: string; dayNum: number; dayOfWeek: number }[]>([]);
-  const [gcalConnected, setGcalConnected] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
-  const [showToast, setShowToast] = useState(false);
-
-  // Initialize selected date to today, and generate the 7 days of the current week (Monday-Sunday)
-  useEffect(() => {
+  const [selectedDate, setSelectedDate] = useState(() => formatDateString(new Date()));
+  const weekDays = useMemo(() => {
     const today = new Date();
-    const todayStr = formatDateString(today);
-    setSelectedDate(todayStr);
-
-    // Get Monday of current week
     const currentDay = today.getDay();
-    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay; // Distance to Monday
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
     const mondayDate = new Date(today);
     mondayDate.setDate(today.getDate() + distanceToMonday);
 
-    const days = [];
-    for (let i = 0; i < 7; i++) {
+    return Array.from({ length: 7 }, (_, index) => {
       const d = new Date(mondayDate);
-      d.setDate(mondayDate.getDate() + i);
-      const dateStr = formatDateString(d);
-      const dayName = d.toLocaleDateString([], { weekday: "short" }).slice(0, 3);
-      const dayNum = d.getDate();
-      const dayOfWeek = d.getDay();
-      days.push({ dateStr, dayName, dayNum, dayOfWeek });
-    }
-    setWeekDays(days);
-
-    // Load GCal preference
-    const savedGcal = localStorage.getItem("lifeos_settings_gcal_connected") === "true";
-    setGcalConnected(savedGcal);
+      d.setDate(mondayDate.getDate() + index);
+      return {
+        dateStr: formatDateString(d),
+        dayName: d.toLocaleDateString([], { weekday: "short" }).slice(0, 3),
+        dayNum: d.getDate(),
+        dayOfWeek: d.getDay(),
+      };
+    });
   }, []);
+  const [gcalConnected, setGcalConnected] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("lifeos_settings_gcal_connected") === "true"
+  );
+  const [toastMsg, setToastMsg] = useState("");
+  const [showToast, setShowToast] = useState(false);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -164,19 +153,19 @@ export default function CalendarPage() {
     <div className="flex flex-col gap-6 px-1 animate-slide-up relative text-slate-800">
       {/* Toast alert */}
       {showToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 glass-panel border-indigo-500/20 px-4 py-2.5 rounded-xl shadow-md z-50 text-xs font-semibold text-indigo-700 flex items-center gap-1.5 animate-slide-down">
-          <Check className="w-3.5 h-3.5 text-indigo-650" />
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 glass-panel border-sky-500/20 px-4 py-2.5 rounded-xl shadow-md z-50 text-xs font-semibold text-sky-700 flex items-center gap-1.5 animate-slide-down">
+          <Check className="h-3.5 w-3.5 text-sky-600" />
           <span>{toastMsg}</span>
         </div>
       )}
 
       {/* Top Selector & Google Calendar Sync Toggle */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 flex items-center justify-between shadow-sm">
+      <div className="glass-panel p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CalendarRange className="w-4.5 h-4.5 text-indigo-600 animate-pulse-glow" />
+          <CalendarRange className="h-5 w-5 text-sky-600 animate-pulse-glow" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-slate-850 uppercase tracking-wider">Sync Controller</span>
-            <span className="text-[9px] text-slate-500 font-mono">Status: {gcalConnected ? "ACTIVE SYNC" : "OFFLINE"}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-900">Calendar sync</span>
+            <span className="text-[9px] text-slate-500 font-mono">Status: {gcalConnected ? "connected" : "offline"}</span>
           </div>
         </div>
         
@@ -186,7 +175,7 @@ export default function CalendarPage() {
         >
           <span className="text-[10px] font-bold uppercase tracking-widest font-mono">Google Calendar</span>
           {gcalConnected ? (
-            <ToggleRight className="w-6 h-6 text-indigo-600" />
+            <ToggleRight className="w-6 h-6 text-sky-500" />
           ) : (
             <ToggleLeft className="w-6 h-6 text-slate-400" />
           )}
@@ -205,7 +194,7 @@ export default function CalendarPage() {
               onClick={() => setSelectedDate(dateStr)}
               className={`flex-1 py-2.5 rounded-xl flex flex-col items-center gap-1 transition-all duration-300 ${
                 isSelected 
-                  ? "bg-gradient-to-br from-indigo-500 to-indigo-650 text-white border border-indigo-400/20 scale-105 shadow-sm shadow-indigo-500/10" 
+                  ? "bg-slate-900 text-white border border-slate-900 shadow-sm" 
                   : "bg-white/80 text-slate-500 border border-slate-200/40 hover:bg-white shadow-sm"
               }`}
             >
@@ -216,7 +205,7 @@ export default function CalendarPage() {
                 isSelected 
                   ? "bg-white/20" 
                   : isToday 
-                    ? "border border-indigo-500/30 text-indigo-600 font-bold bg-indigo-50/20" 
+                    ? "border border-sky-500/30 text-sky-600 font-bold bg-sky-50/20" 
                     : ""
               }`}>
                 {dayNum}
@@ -227,11 +216,11 @@ export default function CalendarPage() {
       </div>
 
       {/* Timeline Schedule Frame */}
-      <div className="glass-panel p-5 rounded-3xl border border-slate-200/50 flex flex-col gap-4 relative overflow-hidden shadow-sm scanline">
+      <div className="glass-panel p-5 flex flex-col gap-4 relative overflow-hidden">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <span className="text-[9px] text-indigo-650 font-bold uppercase tracking-widest flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            Timeline Matrix
+          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-sky-600">
+            <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+            Daily timeline
           </span>
           <span className="text-[8px] font-mono text-slate-400">RANGE: 06:00 - 23:00</span>
         </div>
@@ -247,12 +236,12 @@ export default function CalendarPage() {
             return (
               <div key={hour} className="flex gap-3 items-start min-h-12 group">
                 {/* Time identifier */}
-                <span className="w-10 text-[9px] font-black text-slate-450 text-right mt-1 font-mono tracking-wider">
+                <span className="mt-1 w-10 text-right font-mono text-[9px] font-black tracking-wider text-slate-500">
                   {hourLabel}
                 </span>
 
                 {/* Timeline Grid Slot block */}
-                <div className={`flex-1 flex flex-col gap-2 p-2 rounded-2xl border transition-all duration-300 ${
+                <div className={`flex-1 flex flex-col gap-2 p-2 rounded-lg border transition-colors ${
                   hasData 
                     ? "bg-white/60 border-slate-200/60 shadow-sm" 
                     : "border-dashed border-slate-200 hover:border-slate-300"
@@ -266,9 +255,9 @@ export default function CalendarPage() {
                     return (
                       <div 
                         key={ev.id}
-                        className="bg-sky-500/5 border border-sky-500/20 p-2.5 rounded-xl flex items-center justify-between animate-fade-in relative overflow-hidden"
+                        className="relative flex flex-col gap-2 overflow-hidden rounded-lg border border-sky-500/20 bg-sky-500/5 p-2.5 animate-fade-in sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500"></div>
+                        <div className="absolute bottom-0 left-0 top-0 w-1 bg-sky-500"></div>
                         <div className="flex flex-col gap-0.5">
                           <span className="text-[10px] font-extrabold text-sky-700 uppercase tracking-wide">
                             {isStartSlot ? ev.title : `${ev.title} (Cont.)`}
@@ -277,7 +266,7 @@ export default function CalendarPage() {
                             {ev.startTime} - {ev.endTime}
                           </span>
                         </div>
-                        <span className="text-[8px] bg-sky-500/10 border border-sky-500/20 text-sky-700 px-1.5 py-0.5 rounded font-black tracking-widest font-mono uppercase">
+                        <span className="w-fit rounded border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest text-sky-700">
                           CALENDAR
                         </span>
                       </div>
@@ -292,21 +281,21 @@ export default function CalendarPage() {
                     return (
                       <div 
                         key={task.id}
-                        className={`p-2.5 rounded-xl flex items-center justify-between border transition-all duration-300 relative overflow-hidden ${
+                        className={`relative flex flex-col gap-2 overflow-hidden rounded-lg border p-2.5 transition-all duration-300 sm:flex-row sm:items-center sm:justify-between ${
                           hasConflict 
                             ? "bg-rose-500/5 border-rose-500/40 shadow-sm animate-pulse" 
                             : isDone
                               ? "bg-emerald-500/5 border-emerald-500/20 opacity-70"
-                              : "bg-indigo-500/5 border-indigo-500/15"
+                              : "bg-sky-500/5 border-sky-500/15"
                         }`}
                       >
                         {/* Glowing vertical bar */}
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                          hasConflict ? "bg-rose-500 animate-pulse" : isDone ? "bg-emerald-500" : "bg-indigo-500"
+                        <div className={`absolute bottom-0 left-0 top-0 w-1 ${
+                          hasConflict ? "bg-rose-500 animate-pulse" : isDone ? "bg-emerald-500" : "bg-sky-500"
                         }`}></div>
                         
                         <div className="flex flex-col gap-0.5 pl-1.5">
-                          <span className={`text-[10px] font-bold ${isDone ? "line-through text-slate-450" : "text-slate-800"}`}>
+                          <span className={`text-[10px] font-bold ${isDone ? "text-slate-500 line-through" : "text-slate-800"}`}>
                             {task.title}
                           </span>
                           <span className="text-[9px] text-slate-500 font-mono">
@@ -315,7 +304,7 @@ export default function CalendarPage() {
                         </div>
 
                         {/* Badges */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5 pl-1.5 sm:justify-end sm:pl-0">
                           {hasConflict && (
                             <span className="text-[8px] bg-rose-500/10 border border-rose-500/20 text-rose-600 px-1.5 py-0.5 rounded font-black tracking-wider flex items-center gap-0.5 animate-pulse">
                               <AlertTriangle className="w-2.5 h-2.5 text-rose-500" />
@@ -325,7 +314,7 @@ export default function CalendarPage() {
                           <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border ${
                             isDone 
                               ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700" 
-                              : "bg-indigo-500/10 border-indigo-500/20 text-indigo-650"
+                              : "bg-sky-500/10 border-sky-500/20 text-sky-600"
                           }`}>
                             {task.category}
                           </span>
@@ -334,10 +323,9 @@ export default function CalendarPage() {
                     );
                   })}
 
-                  {/* Empty Slot indication */}
                   {!hasData && (
                     <span className="text-[9px] text-slate-300 font-mono select-none pl-1 py-1">
-                      // empty slot
+                      Empty slot
                     </span>
                   )}
                 </div>

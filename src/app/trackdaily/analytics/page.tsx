@@ -97,7 +97,7 @@ export default function AnalyticsPage() {
     };
   });
 
-  // 4. Behavioral AI Diagnosis Engine
+  // 4. Behavioral insights
   const uniqueDaysPlanned = Array.from(new Set(allTasks.map(t => t.plannedDate)));
   const totalTasksPlanned = allTasks.length;
   const avgPlannedPerDay = uniqueDaysPlanned.length > 0 ? (totalTasksPlanned / uniqueDaysPlanned.length) : 0;
@@ -127,8 +127,8 @@ export default function AnalyticsPage() {
       {/* Header and timeframe selector */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <TrendingUp className="w-4 h-4 text-indigo-650" />
-          <h2 className="text-sm font-bold text-slate-500 tracking-wider uppercase">Analytics Engine</h2>
+          <TrendingUp className="h-4 w-4 text-sky-600" />
+          <h2 className="text-sm font-semibold text-slate-950 tracking-wide">Analytics</h2>
         </div>
 
         {/* Timeframe switch */}
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
             onClick={() => setTimeframe(7)}
             className={`px-3 py-1 text-[10px] font-black uppercase rounded transition-all ${
               timeframe === 7
-                ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
+                ? "bg-white border border-slate-200 text-sky-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -147,7 +147,7 @@ export default function AnalyticsPage() {
             onClick={() => setTimeframe(30)}
             className={`px-3 py-1 text-[10px] font-black uppercase rounded transition-all ${
               timeframe === 30
-                ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
+                ? "bg-white border border-slate-200 text-sky-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -159,13 +159,13 @@ export default function AnalyticsPage() {
       {/* Metrics Panel Grid */}
       <div className="grid grid-cols-2 gap-3.5">
         <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-1 relative overflow-hidden shadow-sm">
-          <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-indigo-500/20 rounded-bl-md"></div>
+          <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-sky-500/20 rounded-bl-md"></div>
           <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
             Completed
           </span>
           <span className="text-2xl font-black text-slate-800 font-mono mt-1 tracking-tight">{completionRate}%</span>
-          <span className="text-[10px] text-slate-500 mt-1">{completedCount} of {totalCount} nodes</span>
+          <span className="text-[10px] text-slate-500 mt-1">{completedCount} of {totalCount} tasks</span>
         </div>
 
         <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-1 relative overflow-hidden shadow-sm">
@@ -175,7 +175,7 @@ export default function AnalyticsPage() {
             Done Late
           </span>
           <span className="text-2xl font-black text-slate-800 font-mono mt-1 tracking-tight">{lateRate}%</span>
-          <span className="text-[10px] text-slate-500 mt-1">{lateCount} nodes delayed</span>
+          <span className="text-[10px] text-slate-500 mt-1">{lateCount} tasks delayed</span>
         </div>
 
         <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-1 relative overflow-hidden shadow-sm">
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
             Missed Rate
           </span>
           <span className="text-2xl font-black text-slate-800 font-mono mt-1 tracking-tight">{missedRate}%</span>
-          <span className="text-[10px] text-slate-500 mt-1">{missedCount} nodes failed</span>
+          <span className="text-[10px] text-slate-500 mt-1">{missedCount} tasks missed</span>
         </div>
 
         <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 flex flex-col gap-1 relative overflow-hidden shadow-sm">
@@ -202,11 +202,11 @@ export default function AnalyticsPage() {
       {/* SVG Bar Chart: Weekly Performance History */}
       <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-4 relative overflow-hidden shadow-sm scanline">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-indigo-650 font-bold uppercase tracking-widest flex items-center gap-1.5">
-            <BarChart3 className="w-3.5 h-3.5 text-indigo-650" />
-            Completion Matrix
+          <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-sky-600">
+            <BarChart3 className="h-3.5 w-3.5 text-sky-600" />
+            Completion trend
           </span>
-          <span className="text-[8px] font-mono text-slate-455">UNIT: % COMPLETED</span>
+          <span className="font-mono text-[8px] text-slate-500">UNIT: % COMPLETED</span>
         </div>
 
         {totalCount > 0 ? (
@@ -215,14 +215,14 @@ export default function AnalyticsPage() {
               <div key={d.dateStr} className="flex flex-col items-center gap-2 w-full group relative">
                 
                 {/* Value tooltip on hover */}
-                <div className="absolute -top-6 bg-indigo-50/90 border border-indigo-200/60 text-indigo-700 text-[8px] font-mono px-1.5 py-0.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                <div className="absolute -top-6 bg-sky-50/90 border border-sky-200/60 text-sky-700 text-[8px] font-mono px-1.5 py-0.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {d.done}/{d.total} Done ({d.pct}%)
                 </div>
 
                 {/* Cyber glass bar */}
                 <div className="w-6 sm:w-8 bg-slate-100/80 border border-slate-200/40 rounded-t-lg relative h-28 flex items-end overflow-hidden shadow-inner">
                   <div 
-                    className="bg-gradient-to-t from-indigo-500 to-sky-400 w-full rounded-t-md transition-all duration-700 ease-out" 
+                    className="bg-sky-600 w-full rounded-t-md transition-all duration-700 ease-out" 
                     style={{ height: `${d.pct}%` }}
                   ></div>
                 </div>
@@ -236,21 +236,21 @@ export default function AnalyticsPage() {
             ))}
           </div>
         ) : (
-          <div className="h-36 flex items-center justify-center border border-dashed border-slate-200/80 rounded-xl text-slate-450 text-xs">
-            No telemetry data recorded in this range.
+          <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-slate-200/80 text-xs text-slate-500">
+            No task data recorded in this range.
           </div>
         )}
       </div>
 
       {/* SVG Donut Chart: Category Distribution */}
       <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-4 relative overflow-hidden shadow-sm">
-        <span className="text-[9px] text-indigo-650 font-bold uppercase tracking-widest flex items-center gap-1.5">
-          <PieChart className="w-3.5 h-3.5 text-indigo-650" />
-          Task Core Distribution
+        <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-sky-600">
+          <PieChart className="h-3.5 w-3.5 text-sky-600" />
+          Category distribution
         </span>
 
         {totalCatCount > 0 ? (
-          <div className="flex items-center gap-6 py-2">
+          <div className="flex flex-col gap-5 py-2 sm:flex-row sm:items-center sm:gap-6">
             {/* SVG circle rendering */}
             <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
               <svg width="96" height="96" viewBox="0 0 36 36" className="transform -rotate-90">
@@ -283,32 +283,30 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Custom Legend */}
-            <div className="flex-1 flex flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2">
               {donutSegments.map(seg => (
                 <div key={seg.category} className="flex items-center justify-between text-[10px]">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-md border border-white/50 shrink-0" style={{ backgroundColor: seg.color }}></span>
-                    <span className="text-slate-655 font-bold">{seg.category}</span>
+                    <span className="font-bold text-slate-700">{seg.category}</span>
                   </div>
-                  <span className="font-mono text-slate-450 font-bold">{seg.percentage}% <span className="text-[8px] font-normal font-sans">({seg.count})</span></span>
+                  <span className="font-mono font-bold text-slate-500">{seg.percentage}% <span className="font-sans text-[8px] font-normal">({seg.count})</span></span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className="py-8 text-center text-slate-450 text-xs border border-dashed border-slate-200/80 rounded-xl">
+          <div className="rounded-xl border border-dashed border-slate-200/80 py-8 text-center text-xs text-slate-500">
             No categories logged.
           </div>
         )}
       </div>
 
-      {/* Behavioral AI Insights Card */}
-      <div className="glass-panel p-5 rounded-2xl border border-indigo-500/10 flex flex-col gap-4 relative overflow-hidden shadow-sm scanline">
-        <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
-        
-        <span className="text-[9px] text-indigo-600 font-bold uppercase tracking-widest flex items-center gap-1.5">
-          <Lightbulb className="w-3.5 h-3.5 text-indigo-650 animate-pulse" />
-          Behavioral AI Diagnostics
+      {/* Behavioral insights */}
+      <div className="glass-panel p-5 rounded-2xl border border-sky-500/10 flex flex-col gap-4 relative overflow-hidden shadow-sm scanline">
+        <span className="text-[9px] text-sky-600 font-bold uppercase tracking-widest flex items-center gap-1.5">
+          <Lightbulb className="h-3.5 w-3.5 text-sky-600" />
+          Behavioral insights
         </span>
 
         <div className="flex flex-col gap-4">
@@ -317,9 +315,9 @@ export default function AnalyticsPage() {
             <div className="bg-rose-500/5 border border-rose-500/20 p-3.5 rounded-xl flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wide">Overplanning Alarm Triggered</span>
+                <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wide">Overplanning risk</span>
                 <p className="text-[10px] text-slate-600 leading-normal">
-                  You are scheduling an average of <span className="font-bold text-slate-800 font-mono">{avgPlannedPerDay.toFixed(1)}</span> nodes/day. Data suggests cognitive overload peaks above 7 nodes, triggering delayed checklists. Downscale daily inputs.
+                  You are scheduling an average of <span className="font-bold text-slate-800 font-mono">{avgPlannedPerDay.toFixed(1)}</span> tasks/day. Consider reducing the daily load when it rises above 7 tasks.
                 </p>
               </div>
             </div>
@@ -329,7 +327,7 @@ export default function AnalyticsPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wide">Workload Calibrated</span>
                 <p className="text-[10px] text-slate-600 leading-normal">
-                  You are scheduling an average of <span className="font-bold text-slate-800 font-mono">{avgPlannedPerDay.toFixed(1)}</span> nodes/day. Workload is currently within optimal cognitive limits (≤ 7 nodes/day).
+                  You are scheduling an average of <span className="font-bold text-slate-800 font-mono">{avgPlannedPerDay.toFixed(1)}</span> tasks/day. Workload is currently within a manageable range.
                 </p>
               </div>
             </div>
@@ -338,11 +336,11 @@ export default function AnalyticsPage() {
           {/* Blocker Analysis Notification */}
           {blockers.count > 0 ? (
             <div className="bg-slate-100/50 border border-slate-200/50 p-3.5 rounded-xl flex items-start gap-2.5 shadow-inner">
-              <TrendingUp className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+              <TrendingUp className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-[11px] font-bold text-indigo-650 uppercase tracking-wide">Flow Bottleneck Detected</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-sky-600">Flow Bottleneck Detected</span>
                 <p className="text-[10px] text-slate-600 leading-normal">
-                  The blocker <span className="font-bold text-indigo-700 italic">"{blockers.reason}"</span> was logged <span className="font-bold text-slate-800 font-mono">{blockers.count}</span> times. Resolve this bottleneck to increase EOD node completion levels.
+                  The blocker <span className="font-bold text-sky-700 italic">&quot;{blockers.reason}&quot;</span> was logged <span className="font-bold text-slate-800 font-mono">{blockers.count}</span> times. Address it to improve completion.
                 </p>
               </div>
             </div>
@@ -350,9 +348,9 @@ export default function AnalyticsPage() {
             <div className="bg-slate-100/50 border border-slate-200/50 p-3.5 rounded-xl flex items-start gap-2.5 shadow-inner">
               <TrendingUp className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-[11px] font-bold text-slate-450 uppercase tracking-wide">Delay Engine Silent</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">No recurring blocker</span>
                 <p className="text-[10px] text-slate-400 leading-normal">
-                  No repeating delay reasons detected. Ensure you log custom delay logs in your EOD Review checklist.
+                  No repeating delay reasons detected in this range.
                 </p>
               </div>
             </div>

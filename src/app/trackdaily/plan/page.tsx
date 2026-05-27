@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { 
   CalendarDays, 
   Plus, 
@@ -14,7 +14,6 @@ import QuickAddDrawer from "@/components/tasks/QuickAddDrawer";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 
 export default function PlanPage() {
-  const [days, setDays] = useState<{ dateStr: string; label: string; tasks: Task[] }[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -22,7 +21,7 @@ export default function PlanPage() {
 
   const { allTasks, refresh } = useTrackDailyContext();
 
-  useEffect(() => {
+  const days = useMemo(() => {
     const today = new Date();
     const list = [];
     
@@ -31,7 +30,7 @@ export default function PlanPage() {
       d.setDate(today.getDate() + i);
       const dateStr = formatDateString(d);
       
-      let label = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      let label = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
       if (i === 0) label = "Today";
       else if (i === 1) label = "Tomorrow";
 
@@ -40,7 +39,7 @@ export default function PlanPage() {
       list.push({ dateStr, label, tasks: tasksForDay });
     }
     
-    setDays(list);
+    return list;
   }, [allTasks]);
 
   const handleTaskClick = (task: Task) => {
@@ -76,8 +75,8 @@ export default function PlanPage() {
     <div className="flex flex-col gap-5 px-1 animate-slide-up">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <CalendarDays className="w-4 h-4 text-purple-400" />
-          <h2 className="text-sm font-bold text-white tracking-wide">7-Day Planning Horizon</h2>
+          <CalendarDays className="w-4 h-4 text-sky-700" />
+          <h2 className="text-sm font-semibold text-slate-950 tracking-wide">7-day plan</h2>
         </div>
         <span className="text-[10px] text-zinc-500 font-semibold">
           Select date to plan
@@ -88,19 +87,19 @@ export default function PlanPage() {
         {days.map(({ dateStr, label, tasks }) => (
           <div 
             key={dateStr}
-            className="glass-panel p-4.5 rounded-2xl border border-white/5 flex flex-col gap-3 relative"
+            className="glass-panel p-4 flex flex-col gap-3 relative"
           >
             {/* Day Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-sm font-bold text-white">{label}</h3>
-                <span className="text-[10px] text-zinc-500 font-medium">
+                <h3 className="text-sm font-semibold text-slate-950">{label}</h3>
+                <span className="text-[10px] text-slate-500 font-medium">
                   {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
                 </span>
               </div>
               <button 
                 onClick={() => handleAddTaskClick(dateStr)}
-                className="p-1.5 bg-purple-500/15 border border-purple-500/25 text-purple-300 rounded-lg hover:bg-purple-500/20 hover:text-purple-200 transition-all"
+                className="p-1.5 bg-slate-900 border border-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
                 title={`Plan task for ${label}`}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -114,24 +113,24 @@ export default function PlanPage() {
                   <div 
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
-                    className="flex items-center justify-between p-2.5 bg-zinc-900/60 hover:bg-zinc-900 border border-white/5 rounded-xl cursor-pointer transition-all"
+                    className="flex cursor-pointer flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 transition-colors hover:bg-white sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex min-w-0 items-center gap-2.5">
                       {renderStatusIcon(task.status)}
-                      <span className={`text-xs font-semibold text-zinc-200 truncate ${
+                      <span className={`text-xs font-semibold text-slate-800 truncate ${
                         (task.status === "done" || task.status === "done_late") ? "line-through opacity-50" : ""
                       }`}>
                         {task.title}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 pl-6 sm:justify-end sm:pl-0">
                       {task.plannedTime && (
-                        <span className="text-[9px] text-zinc-500 font-bold bg-zinc-800 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] text-slate-500 font-bold bg-white border border-slate-200 px-1.5 py-0.5 rounded">
                           {task.plannedTime}
                         </span>
                       )}
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-purple-400 bg-purple-500/5 border border-purple-500/10 px-1.5 py-0.5 rounded">
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-sky-700 bg-sky-50 border border-sky-100 px-1.5 py-0.5 rounded">
                         {task.category}
                       </span>
                     </div>
@@ -139,7 +138,7 @@ export default function PlanPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-zinc-600 italic">No tasks planned. Tap '+' to schedule one.</p>
+              <p className="text-[11px] text-slate-500">No tasks planned. Tap + to schedule one.</p>
             )}
           </div>
         ))}

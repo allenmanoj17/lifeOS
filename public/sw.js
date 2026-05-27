@@ -6,6 +6,8 @@ const ASSETS_TO_CACHE = [
   "/trackdaily/calendar",
   "/trackdaily/analytics",
   "/trackdaily/settings",
+  "/icon-192.png",
+  "/icon-512.png",
   "/icon.svg",
   "/manifest.json"
 ];

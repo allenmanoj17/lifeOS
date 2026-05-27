@@ -9,7 +9,13 @@ export default defineSchema({
     category: v.string(),
     plannedDate: v.string(), // "YYYY-MM-DD"
     plannedTime: v.optional(v.string()), // "HH:MM"
-    status: v.string(), // "planned" | "done" | "done_late" | "missed" | "skipped"
+    status: v.union(
+      v.literal("planned"),
+      v.literal("done"),
+      v.literal("done_late"),
+      v.literal("missed"),
+      v.literal("skipped")
+    ),
     completedAt: v.optional(v.string()), // ISO Datetime
     delayReason: v.optional(v.string()),
     skipReason: v.optional(v.string()),
@@ -25,8 +31,12 @@ export default defineSchema({
     isRecurring: v.boolean(),
     recurringRule: v.optional(
       v.object({
-        frequency: v.string(), // "daily" | "weekly" | "monthly"
-        daysOfWeek: v.optional(v.array(v.float64())), // 0-6
+        frequency: v.union(
+          v.literal("daily"),
+          v.literal("weekly"),
+          v.literal("monthly")
+        ),
+        daysOfWeek: v.optional(v.array(v.number())), // 0-6
         endDate: v.optional(v.string()),
       })
     ),
@@ -36,7 +46,9 @@ export default defineSchema({
   })
   .index("by_plannedDate", ["plannedDate"])
   .index("by_reminderId", ["reminderId"])
-  .index("by_userId_plannedDate", ["userId", "plannedDate"]),
+  .index("by_userId", ["userId"])
+  .index("by_userId_and_plannedDate", ["userId", "plannedDate"])
+  .index("by_userId_and_reminderId", ["userId", "reminderId"]),
 
   dailyReviews: defineTable({
     userId: v.string(),
@@ -45,7 +57,8 @@ export default defineSchema({
     reviewedAt: v.string(), // ISO Datetime
   })
   .index("by_date", ["date"])
-  .index("by_userId_date", ["userId", "date"]),
+  .index("by_userId", ["userId"])
+  .index("by_userId_and_date", ["userId", "date"]),
 
   weeklyReviews: defineTable({
     userId: v.string(),
@@ -54,5 +67,6 @@ export default defineSchema({
     reviewedAt: v.string(), // ISO Datetime
   })
   .index("by_weekStart", ["weekStart"])
-  .index("by_userId_weekStart", ["userId", "weekStart"]),
+  .index("by_userId", ["userId"])
+  .index("by_userId_and_weekStart", ["userId", "weekStart"]),
 });

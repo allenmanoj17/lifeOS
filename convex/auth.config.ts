@@ -1,4 +1,4 @@
-export default {
+const authConfig = {
   providers: [
     {
       // The issuer domain from your Clerk application dashboard
@@ -7,3 +7,5 @@ export default {
     },
   ],
 };
+
+export default authConfig;

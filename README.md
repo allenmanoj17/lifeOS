@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LifeOS
 
-## Getting Started
+LifeOS is a personal planning workspace built with Next.js, React, Tailwind CSS, Convex, and Clerk.
 
-First, run the development server:
+The current product surface is TrackDaily: a mobile-first task planner with daily planning, seven-day planning, calendar conflict views, analytics, reviews, settings, PWA metadata, and basic notification hooks.
+
+## Stack
+
+- Next.js 16 App Router
+- React 19
+- Tailwind CSS 4
+- Convex backend
+- Clerk authentication
+- lucide-react icons
+- PWA manifest and service worker
+
+## Requirements
+
+- Node.js 20 or newer
+- npm
+- Convex project
+- Clerk application with a Convex JWT template named `convex`
+
+## Environment
+
+Create `.env.local` with:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_CONVEX_URL=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_JWT_ISSUER_DOMAIN=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Clerk must return a token for the `convex` JWT template with audience `convex`. Without these values the app intentionally shows a configuration or auth connection screen instead of falling back to local storage.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+## Validation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run these before pushing:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run lint
+npm run build
+```
 
-## Deploy on Vercel
+Both commands pass on the current working tree.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## App Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `/` - LifeOS hub
+- `/trackdaily` - Today view
+- `/trackdaily/plan` - Seven-day plan
+- `/trackdaily/calendar` - Timeline and mock Google Calendar conflict view
+- `/trackdaily/analytics` - Completion, category, and behavior metrics
+- `/trackdaily/review` - Daily and weekly review flows
+- `/trackdaily/settings` - Profile, categories, reminders, calendar mock toggle, import/export
+
+## Current Notes
+
+- Convex plus Clerk is the only supported task data path.
+- Google Calendar is currently mocked with local toggle state.
+- PWA install metadata and basic service worker caching are included.
+- Browser notification permission and local notification scheduling hooks exist, but full production web push, snooze, and notification action handling are not complete.
+- The project includes Next.js 16 generated docs in `node_modules/next/dist/docs/`; read the relevant guide before changing framework-level routing, config, or API patterns.
+
+## Deployment
+
+The app is suitable for Vercel once the Convex and Clerk environment variables are configured in the deployment environment.

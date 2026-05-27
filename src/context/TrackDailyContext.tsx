@@ -1,32 +1,32 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { useQuery, useMutation } from "convex/react";
+import React, { createContext, useContext, useEffect, ReactNode } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Task, TaskStatus, DailyReview, WeeklyReview } from "@/app/trackdaily/types";
-import * as localDb from "@/app/trackdaily/db";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { DailyReview, Task, WeeklyReview } from "@/app/trackdaily/types";
 import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
 
-const hasConvex = typeof window !== "undefined" && !!process.env.NEXT_PUBLIC_CONVEX_URL;
+type TaskInput = Omit<Task, "id" | "createdAt" | "updatedAt">;
+type TaskUpdate = Partial<Omit<Task, "id" | "createdAt" | "updatedAt">>;
 
 interface TrackDailyContextType {
   allTasks: Task[];
   dailyReviews: DailyReview[];
   weeklyReviews: WeeklyReview[];
   isLoading: boolean;
-  createTask: (taskData: Omit<Task, "id" | "createdAt" | "updatedAt">) => Promise<void>;
-  updateTask: (id: string, fields: Partial<Task>) => Promise<void>;
+  createTask: (taskData: TaskInput) => Promise<void>;
+  updateTask: (id: string, fields: TaskUpdate) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   createDailyReview: (date: string, reflectionNote?: string) => Promise<void>;
   createWeeklyReview: (weekStart: string, reflectionNote?: string) => Promise<void>;
   refresh: () => void;
-  isConvex: boolean;
+  isConvex: true;
 }
 
 const TrackDailyContext = createContext<TrackDailyContextType | undefined>(undefined);
 
-// Helper to map Convex record structure to frontend Task type
-function mapConvexTask(convexTask: any): Task {
+function mapConvexTask(convexTask: Doc<"tasks">): Task {
   return {
     id: convexTask._id,
     title: convexTask.title,
@@ -34,7 +34,7 @@ function mapConvexTask(convexTask: any): Task {
     category: convexTask.category,
     plannedDate: convexTask.plannedDate,
     plannedTime: convexTask.plannedTime,
-    status: convexTask.status as TaskStatus,
+    status: convexTask.status,
     completedAt: convexTask.completedAt,
     delayReason: convexTask.delayReason,
     skipReason: convexTask.skipReason,
@@ -47,117 +47,25 @@ function mapConvexTask(convexTask: any): Task {
   };
 }
 
-// Helper to map Convex daily reviews
-function mapConvexDailyReview(r: any): DailyReview {
+function mapConvexDailyReview(review: Doc<"dailyReviews">): DailyReview {
   return {
-    id: r._id,
-    date: r.date,
-    reflectionNote: r.reflectionNote,
-    reviewedAt: r.reviewedAt || new Date(r._creationTime).toISOString(),
+    id: review._id,
+    date: review.date,
+    reflectionNote: review.reflectionNote,
+    reviewedAt: review.reviewedAt || new Date(review._creationTime).toISOString(),
   };
 }
 
-// Helper to map Convex weekly reviews
-function mapConvexWeeklyReview(r: any): WeeklyReview {
+function mapConvexWeeklyReview(review: Doc<"weeklyReviews">): WeeklyReview {
   return {
-    id: r._id,
-    weekStart: r.weekStart,
-    reflectionNote: r.reflectionNote,
-    reviewedAt: r.reviewedAt || new Date(r._creationTime).toISOString(),
+    id: review._id,
+    weekStart: review.weekStart,
+    reflectionNote: review.reflectionNote,
+    reviewedAt: review.reviewedAt || new Date(review._creationTime).toISOString(),
   };
 }
 
-// 1. Local Storage Implementation Provider
-function LocalTrackDailyProvider({ children }: { children: ReactNode }) {
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
-  const [dailyReviews, setDailyReviews] = useState<DailyReview[]>([]);
-  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useNotificationScheduler(allTasks);
-
-  const refresh = useCallback(() => {
-    setIsLoading(true);
-    localDb.generateRecurringInstances();
-    setAllTasks(localDb.getAllTasks());
-    
-    // Load reviews
-    const localDaily = JSON.parse(localStorage.getItem("lifeos_daily_reviews") || "[]");
-    const localWeekly = JSON.parse(localStorage.getItem("lifeos_weekly_reviews") || "[]");
-    setDailyReviews(localDaily);
-    setWeeklyReviews(localWeekly);
-    
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const createTask = async (taskData: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
-    localDb.createTask(taskData);
-    refresh();
-  };
-
-  const updateTask = async (id: string, fields: Partial<Task>) => {
-    localDb.updateTask(id, fields);
-    refresh();
-  };
-
-  const deleteTask = async (id: string) => {
-    localDb.deleteTask(id);
-    refresh();
-  };
-
-  const createDailyReview = async (date: string, reflectionNote?: string) => {
-    const reviews = JSON.parse(localStorage.getItem("lifeos_daily_reviews") || "[]");
-    const filtered = reviews.filter((r: any) => r.date !== date);
-    filtered.push({
-      id: Math.random().toString(36).substring(2, 9),
-      date,
-      reflectionNote,
-      reviewedAt: new Date().toISOString(),
-    });
-    localStorage.setItem("lifeos_daily_reviews", JSON.stringify(filtered));
-    refresh();
-  };
-
-  const createWeeklyReview = async (weekStart: string, reflectionNote?: string) => {
-    const reviews = JSON.parse(localStorage.getItem("lifeos_weekly_reviews") || "[]");
-    const filtered = reviews.filter((r: any) => r.weekStart !== weekStart);
-    filtered.push({
-      id: Math.random().toString(36).substring(2, 9),
-      weekStart,
-      reflectionNote,
-      reviewedAt: new Date().toISOString(),
-    });
-    localStorage.setItem("lifeos_weekly_reviews", JSON.stringify(filtered));
-    refresh();
-  };
-
-  return (
-    <TrackDailyContext.Provider 
-      value={{
-        allTasks,
-        dailyReviews,
-        weeklyReviews,
-        isLoading,
-        createTask,
-        updateTask,
-        deleteTask,
-        createDailyReview,
-        createWeeklyReview,
-        refresh,
-        isConvex: false
-      }}
-    >
-      {children}
-    </TrackDailyContext.Provider>
-  );
-}
-
-// 2. Convex Implementation Provider (Only instantiated when hasConvex is true)
-function ConvexTrackDailyProviderInner({ children }: { children: ReactNode }) {
+export function TrackDailyProvider({ children }: { children: ReactNode }) {
   const convexTasks = useQuery(api.tasks.getAllTasks);
   const convexDaily = useQuery(api.tasks.getAllDailyReviews);
   const convexWeekly = useQuery(api.tasks.getAllWeeklyReviews);
@@ -167,42 +75,40 @@ function ConvexTrackDailyProviderInner({ children }: { children: ReactNode }) {
   const convexDeleteTask = useMutation(api.tasks.deleteTask);
   const convexCreateDaily = useMutation(api.tasks.createDailyReview);
   const convexCreateWeekly = useMutation(api.tasks.createWeeklyReview);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const generateRecurringInstances = useMutation(api.tasks.generateRecurringInstances);
 
   useEffect(() => {
-    if (convexTasks !== undefined && convexDaily !== undefined && convexWeekly !== undefined) {
-      setIsLoading(false);
-    }
-  }, [convexTasks, convexDaily, convexWeekly]);
+    void generateRecurringInstances();
+  }, [generateRecurringInstances]);
 
-  const tasks = convexTasks ? (convexTasks as any[]).map(mapConvexTask) : [];
-  const daily = convexDaily ? (convexDaily as any[]).map(mapConvexDailyReview) : [];
-  const weekly = convexWeekly ? (convexWeekly as any[]).map(mapConvexWeeklyReview) : [];
+  const tasks = convexTasks?.map(mapConvexTask) ?? [];
+  const daily = convexDaily?.map(mapConvexDailyReview) ?? [];
+  const weekly = convexWeekly?.map(mapConvexWeeklyReview) ?? [];
+  const isLoading =
+    convexTasks === undefined || convexDaily === undefined || convexWeekly === undefined;
 
   useNotificationScheduler(tasks);
 
-  const createTask = async (taskData: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
+  const createTask = async (taskData: TaskInput) => {
     const nowStr = new Date().toISOString();
     await convexCreateTask({
       ...taskData,
       createdAt: nowStr,
-      updatedAt: nowStr
+      updatedAt: nowStr,
     });
   };
 
-  const updateTask = async (id: string, fields: Partial<Task>) => {
+  const updateTask = async (id: string, fields: TaskUpdate) => {
     const nowStr = new Date().toISOString();
-    const { id: _, createdAt: __, ...updateFields } = fields;
     await convexUpdateTask({
-      id: id as any,
-      ...updateFields,
-      updatedAt: nowStr
+      id: id as Id<"tasks">,
+      ...fields,
+      updatedAt: nowStr,
     });
   };
 
   const deleteTask = async (id: string) => {
-    await convexDeleteTask({ id: id as any });
+    await convexDeleteTask({ id: id as Id<"tasks"> });
   };
 
   const createDailyReview = async (date: string, reflectionNote?: string) => {
@@ -222,11 +128,11 @@ function ConvexTrackDailyProviderInner({ children }: { children: ReactNode }) {
   };
 
   const refresh = () => {
-    // Convex is live/real-time, no manual refresh needed!
+    void generateRecurringInstances();
   };
 
   return (
-    <TrackDailyContext.Provider 
+    <TrackDailyContext.Provider
       value={{
         allTasks: tasks,
         dailyReviews: daily,
@@ -238,19 +144,12 @@ function ConvexTrackDailyProviderInner({ children }: { children: ReactNode }) {
         createDailyReview,
         createWeeklyReview,
         refresh,
-        isConvex: true
+        isConvex: true,
       }}
     >
       {children}
     </TrackDailyContext.Provider>
   );
-}
-
-export function TrackDailyProvider({ children }: { children: ReactNode }) {
-  if (hasConvex) {
-    return <ConvexTrackDailyProviderInner>{children}</ConvexTrackDailyProviderInner>;
-  }
-  return <LocalTrackDailyProvider>{children}</LocalTrackDailyProvider>;
 }
 
 export function useTrackDailyContext() {

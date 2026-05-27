@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   Check, 
   BookOpen, 
@@ -11,55 +11,55 @@ import {
 import { formatDateString } from "../db";
 import { useTrackDailyContext } from "@/context/TrackDailyContext";
 
+type Resolution = {
+  action: "carry" | "reschedule" | "skip" | "missed";
+  rescheduleDate?: string;
+  reason?: string;
+};
+
+function getMonday(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(date.setDate(diff));
+  return formatDateString(monday);
+}
+
 export default function ReviewPage() {
   const { allTasks, dailyReviews, weeklyReviews, createDailyReview, createWeeklyReview, updateTask } = useTrackDailyContext();
 
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   
   // Date states
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedWeekStart, setSelectedWeekStart] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => formatDateString(new Date()));
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() => getMonday(new Date()));
   
   // Reflection states
-  const [reflectionNote, setReflectionNote] = useState("");
+  const [reflectionDrafts, setReflectionDrafts] = useState<Record<string, string>>({});
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
 
   // Unfinished task resolution states
-  const [resolutions, setResolutions] = useState<{
-    [taskId: string]: {
-      action: "carry" | "reschedule" | "skip" | "missed";
-      rescheduleDate?: string;
-      reason?: string;
-    };
-  }>({});
+  const [resolutionDrafts, setResolutionDrafts] = useState<Record<string, Record<string, Resolution>>>({});
 
-  // Helper: get Monday of a given date
-  const getMonday = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-    const monday = new Date(date.setDate(diff));
-    return formatDateString(monday);
+  const reviewKey = activeTab === "daily" ? `daily:${selectedDate}` : `weekly:${selectedWeekStart}`;
+  const savedReflection =
+    activeTab === "daily"
+      ? dailyReviews.find((review) => review.date === selectedDate)?.reflectionNote
+      : weeklyReviews.find((review) => review.weekStart === selectedWeekStart)?.reflectionNote;
+  const reflectionNote = reflectionDrafts[reviewKey] ?? savedReflection ?? "";
+  const resolutions = resolutionDrafts[selectedDate] ?? {};
+  const setReflectionNote = (value: string) => {
+    setReflectionDrafts((previous) => ({ ...previous, [reviewKey]: value }));
   };
-
-  useEffect(() => {
-    const today = new Date();
-    setSelectedDate(formatDateString(today));
-    setSelectedWeekStart(getMonday(today));
-  }, []);
-
-  // Sync / Reset reflection note when date or tab changes
-  useEffect(() => {
-    if (activeTab === "daily" && selectedDate) {
-      const existing = dailyReviews.find(r => r.date === selectedDate);
-      setReflectionNote(existing?.reflectionNote || "");
-      setResolutions({});
-    } else if (activeTab === "weekly" && selectedWeekStart) {
-      const existing = weeklyReviews.find(r => r.weekStart === selectedWeekStart);
-      setReflectionNote(existing?.reflectionNote || "");
-    }
-  }, [activeTab, selectedDate, selectedWeekStart, dailyReviews, weeklyReviews]);
+  const updateResolutions = (
+    updater: (previous: Record<string, Resolution>) => Record<string, Resolution>
+  ) => {
+    setResolutionDrafts((previous) => ({
+      ...previous,
+      [selectedDate]: updater(previous[selectedDate] ?? {}),
+    }));
+  };
 
   // Find tasks for the selected daily review date
   const dailyTasks = allTasks.filter(t => t.plannedDate === selectedDate);
@@ -105,7 +105,7 @@ export default function ReviewPage() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = formatDateString(tomorrow);
 
-    setResolutions(prev => ({
+    updateResolutions(prev => ({
       ...prev,
       [taskId]: {
         ...prev[taskId],
@@ -117,7 +117,7 @@ export default function ReviewPage() {
   };
 
   const handleResolutionDate = (taskId: string, date: string) => {
-    setResolutions(prev => ({
+    updateResolutions(prev => ({
       ...prev,
       [taskId]: {
         ...prev[taskId],
@@ -127,7 +127,7 @@ export default function ReviewPage() {
   };
 
   const handleResolutionReason = (taskId: string, reason: string) => {
-    setResolutions(prev => ({
+    updateResolutions(prev => ({
       ...prev,
       [taskId]: {
         ...prev[taskId],
@@ -144,7 +144,7 @@ export default function ReviewPage() {
     for (const task of unfinishedDailyTasks) {
       const res = resolutions[task.id];
       if (!res) {
-        triggerToast("Please choose an EOD action for all unfinished items");
+        triggerToast("Please choose an action for all unfinished items");
         return;
       }
 
@@ -167,14 +167,14 @@ export default function ReviewPage() {
       } else if (res.action === "missed") {
         await updateTask(task.id, {
           status: "missed",
-          delayReason: res.reason || "Uncompleted EOD task"
+          delayReason: res.reason || "Uncompleted task"
         });
       }
     }
 
     await createDailyReview(selectedDate, reflectionNote);
     triggerToast("Daily reflection submitted successfully!");
-    setResolutions({});
+    setResolutionDrafts((previous) => ({ ...previous, [selectedDate]: {} }));
   };
 
   // Submit Weekly Review
@@ -190,8 +190,8 @@ export default function ReviewPage() {
     <div className="flex flex-col gap-6 px-1 animate-slide-up relative text-slate-800">
       {/* Toast Alert */}
       {showToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 glass-panel border-indigo-500/20 px-4 py-2.5 rounded-xl shadow-md z-50 text-xs font-semibold text-indigo-750 flex items-center gap-1.5 animate-slide-down">
-          <Check className="w-3.5 h-3.5 text-indigo-650" />
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 glass-panel border-sky-500/20 px-4 py-2.5 rounded-xl shadow-md z-50 text-xs font-semibold text-sky-700 flex items-center gap-1.5 animate-slide-down">
+          <Check className="w-3.5 h-3.5 text-sky-500" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -202,7 +202,7 @@ export default function ReviewPage() {
           onClick={() => setActiveTab("daily")}
           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             activeTab === "daily"
-              ? "bg-indigo-600 text-white shadow-sm"
+              ? "bg-sky-500 text-white shadow-sm"
               : "text-slate-500 hover:text-slate-800"
           }`}
         >
@@ -212,7 +212,7 @@ export default function ReviewPage() {
           onClick={() => setActiveTab("weekly")}
           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             activeTab === "weekly"
-              ? "bg-indigo-600 text-white shadow-sm"
+              ? "bg-sky-500 text-white shadow-sm"
               : "text-slate-500 hover:text-slate-800"
           }`}
         >
@@ -226,15 +226,15 @@ export default function ReviewPage() {
           {/* Header & Date Selector */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-indigo-600 font-bold uppercase tracking-widest flex items-center gap-1">
-                <CalendarCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="text-[9px] text-sky-600 font-bold uppercase tracking-widest flex items-center gap-1">
+                <CalendarCheck className="w-3.5 h-3.5 text-sky-600" />
                 Reflection Target
               </span>
               <input 
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[11px] font-bold focus:outline-none focus:border-indigo-500 font-mono"
+                className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[11px] font-bold focus:outline-none focus:border-sky-400 font-mono"
               />
             </div>
             
@@ -255,7 +255,7 @@ export default function ReviewPage() {
           {/* Unfinished Task Resolutions */}
           {unfinishedDailyTasks.length > 0 && (
             <div className="flex flex-col gap-3">
-              <h3 className="text-[10px] font-bold text-slate-450 tracking-widest uppercase px-1">
+              <h3 className="px-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                 Resolve Unfinished Nodes ({unfinishedDailyTasks.length})
               </h3>
               
@@ -266,13 +266,13 @@ export default function ReviewPage() {
                   return (
                     <div 
                       key={task.id} 
-                      className="glass-panel p-4.5 rounded-2xl border border-slate-200/50 flex flex-col gap-3.5 relative overflow-hidden shadow-sm"
+                      className="glass-panel relative flex flex-col gap-3.5 overflow-hidden rounded-lg border border-slate-200/50 p-4 shadow-sm"
                     >
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500/40"></div>
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-sky-500/40"></div>
                       
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs font-bold text-slate-800">{task.title}</span>
-                        <span className="text-[10px] text-slate-450">Planned for: {task.plannedTime || "No specific time"}</span>
+                        <span className="text-[10px] text-slate-500">Planned for: {task.plannedTime || "No specific time"}</span>
                       </div>
 
                       {/* Action selector */}
@@ -289,7 +289,7 @@ export default function ReviewPage() {
                             onClick={() => handleResolutionAction(task.id, opt.key)}
                             className={`py-1.5 text-[9px] font-extrabold uppercase rounded-lg border transition-all cursor-pointer ${
                               currentRes.action === opt.key
-                                ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-700 shadow-sm"
+                                ? "bg-sky-500/10 border-sky-500/20 text-sky-700 shadow-sm"
                                 : "bg-slate-100/50 border-slate-200/50 text-slate-500 hover:text-slate-800"
                             }`}
                           >
@@ -301,12 +301,12 @@ export default function ReviewPage() {
                       {/* Custom Reschedule Calendar Picker */}
                       {currentRes.action === "reschedule" && (
                         <div className="flex items-center gap-2 animate-fade-in">
-                          <span className="text-[9px] text-slate-550 font-bold uppercase shrink-0">New Date:</span>
+                          <span className="shrink-0 text-[9px] font-bold uppercase text-slate-600">New Date:</span>
                           <input 
                             type="date"
                             value={currentRes.rescheduleDate || ""}
                             onChange={(e) => handleResolutionDate(task.id, e.target.value)}
-                            className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[10px] font-bold focus:outline-none focus:border-indigo-500 font-mono flex-1"
+                            className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[10px] font-bold focus:outline-none focus:border-sky-400 font-mono flex-1"
                           />
                         </div>
                       )}
@@ -331,11 +331,11 @@ export default function ReviewPage() {
 
           {/* If everything is done - congratulate */}
           {dailyTasks.length > 0 && unfinishedDailyTasks.length === 0 && (
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center flex flex-col items-center gap-2 scanline">
+            <div className="glass-panel p-5 border border-emerald-200 bg-emerald-50 text-center flex flex-col items-center gap-2">
               <Check className="w-8 h-8 text-emerald-600 animate-pulse" />
-              <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Digital Cortex Completed</h4>
+              <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Day complete</h4>
               <p className="text-[10px] text-slate-500 max-w-[240px] leading-relaxed font-medium">
-                All scheduled nodes for this target day have been marked complete. Excellent operational performance.
+                All scheduled tasks for this day have been marked complete.
               </p>
             </div>
           )}
@@ -343,12 +343,12 @@ export default function ReviewPage() {
           {/* Reflection notes journaling */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-3.5 shadow-sm">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-indigo-650" />
-              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Cognitive Reflection Journal</h3>
+              <BookOpen className="w-4 h-4 text-sky-500" />
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Daily reflection</h3>
             </div>
             
             <textarea
-              placeholder="Conduct a retrospective summary... What triggered delays? How was your overall flow state today?"
+              placeholder="What worked, what slipped, and what should change tomorrow?"
               value={reflectionNote}
               onChange={(e) => setReflectionNote(e.target.value)}
               className="glass-input text-xs px-3 py-2.5 h-28 resize-none leading-relaxed placeholder:text-slate-400"
@@ -357,7 +357,7 @@ export default function ReviewPage() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-850 hover:opacity-95 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_4px_15px_rgba(99,102,241,0.25)] cursor-pointer"
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-widest rounded-lg transition-colors cursor-pointer"
           >
             Submit Daily Reflection
           </button>
@@ -368,15 +368,15 @@ export default function ReviewPage() {
           {/* Week Start Selector */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-3 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-indigo-650 font-bold uppercase tracking-widest flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
-                Audit Week Start (Mon)
+              <span className="text-[9px] text-sky-600 font-bold uppercase tracking-widest flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5 text-sky-500" />
+                Week start
               </span>
               <input 
                 type="date"
                 value={selectedWeekStart}
                 onChange={(e) => setSelectedWeekStart(getMonday(new Date(e.target.value)))}
-                className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[11px] font-bold focus:outline-none focus:border-indigo-500 font-mono"
+                className="bg-white border border-slate-200 rounded px-2.5 py-1 text-slate-800 text-[11px] font-bold focus:outline-none focus:border-sky-400 font-mono"
               />
             </div>
             
@@ -388,11 +388,11 @@ export default function ReviewPage() {
             <div className="grid grid-cols-2 gap-3 mt-2 text-xs">
               <div className="bg-slate-100/50 p-3 rounded-xl border border-slate-200/55 shadow-inner">
                 <span className="text-slate-500 block text-[9px] font-bold uppercase tracking-wider">Completion Rate</span>
-                <span className="text-xl font-extrabold text-indigo-650 font-mono mt-0.5 block">{weeklyRate}%</span>
+                <span className="text-xl font-extrabold text-sky-500 font-mono mt-0.5 block">{weeklyRate}%</span>
               </div>
               <div className="bg-slate-100/50 p-3 rounded-xl border border-slate-200/55 shadow-inner">
-                <span className="text-slate-500 block text-[9px] font-bold uppercase tracking-wider">Processed Nodes</span>
-                <span className="text-xl font-extrabold text-slate-850 font-mono mt-0.5 block">{weeklyCompleted} <span className="text-slate-450 text-xs font-normal">/ {weeklyTotal}</span></span>
+                <span className="text-slate-500 block text-[9px] font-bold uppercase tracking-wider">Completed tasks</span>
+                <span className="mt-0.5 block font-mono text-xl font-extrabold text-slate-900">{weeklyCompleted} <span className="text-xs font-normal text-slate-500">/ {weeklyTotal}</span></span>
               </div>
             </div>
           </div>
@@ -400,19 +400,19 @@ export default function ReviewPage() {
           {/* Daily Reflections Feed - Collapsible scroll container */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-3.5 shadow-sm">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-indigo-650" />
-              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Daily Reflection Diaries</h3>
+              <FileText className="w-4 h-4 text-sky-500" />
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Daily reflections</h3>
             </div>
             
             {weeklyDailyReviews.length > 0 ? (
               <div className="flex flex-col gap-2.5 max-h-56 overflow-y-auto pr-1">
                 {weeklyDailyReviews.map(review => (
                   <div key={review.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200/50 flex flex-col gap-1.5 shadow-inner">
-                    <div className="flex items-center justify-between text-[9px] font-bold tracking-widest text-indigo-650 font-mono uppercase">
+                    <div className="flex items-center justify-between text-[9px] font-bold tracking-widest text-sky-600 font-mono uppercase">
                       <span>{review.date}</span>
-                      <span className="text-slate-400">DIARY LOG</span>
+                      <span className="text-slate-400">NOTE</span>
                     </div>
-                    <p className="text-[11px] text-slate-655 leading-relaxed italic">
+                    <p className="text-[11px] italic leading-relaxed text-slate-600">
                       {review.reflectionNote || "No note recorded for this day."}
                     </p>
                   </div>
@@ -420,7 +420,7 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div className="bg-slate-50/50 border border-dashed border-slate-200 p-4 rounded-xl text-center text-slate-400 text-xs shadow-inner">
-                No daily logs recorded in this timeline.
+                No daily reflections recorded in this week.
               </div>
             )}
           </div>
@@ -428,12 +428,12 @@ export default function ReviewPage() {
           {/* Weekly reflection note */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 flex flex-col gap-3.5 shadow-sm">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Weekly Audit Synthesis</h3>
+              <BookOpen className="w-4 h-4 text-sky-500" />
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide">Weekly reflection</h3>
             </div>
             
             <textarea
-              placeholder="Synthesize the weekly data... What behavioral shifts did you witness? What patterns needs adjusting next week?"
+              placeholder="What patterns should carry into next week, and what needs adjusting?"
               value={reflectionNote}
               onChange={(e) => setReflectionNote(e.target.value)}
               className="glass-input text-xs px-3 py-2.5 h-28 resize-none leading-relaxed placeholder:text-slate-400"
@@ -442,7 +442,7 @@ export default function ReviewPage() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-850 hover:opacity-95 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_4px_15px_rgba(99,102,241,0.25)] cursor-pointer"
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs uppercase tracking-widest rounded-lg transition-colors cursor-pointer"
           >
             Submit Weekly Audit
           </button>
