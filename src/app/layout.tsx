@@ -6,13 +6,13 @@ import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LifeOS",
-  description: "Personal planning, habits, and behavioral analytics hub.",
+  title: "Epta LifeOS",
+  description: "Warm personal OS for planning, reviews, calendar awareness, and reminders.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "LifeOS",
+    title: "Epta LifeOS",
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f7f9",
+  themeColor: "#f8f3e8",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -38,7 +38,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="font-jakarta min-h-full flex flex-col selection:bg-sky-200 selection:text-slate-950">
+      <body className="font-jakarta min-h-full flex flex-col selection:bg-primary/20 selection:text-foreground">
         <PwaRegistry />
         <ConvexClientProvider serverMissingEnv={serverMissingEnv}>
           <TrackDailyProvider>

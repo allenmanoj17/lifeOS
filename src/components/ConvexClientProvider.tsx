@@ -27,7 +27,7 @@ function ConfigErrorScreen({ missing }: { missing: string[] }) {
           Configuration Required
         </div>
         <p className="text-xs text-slate-600 leading-relaxed mt-3">
-          LifeOS now requires Convex and Clerk. Add the missing environment
+          Epta LifeOS requires Convex and Clerk. Add the missing environment
           variables before loading the app.
         </p>
         <div className="mt-4 flex flex-col gap-2">
@@ -124,7 +124,7 @@ function AuthGate({ children }: { children: ReactNode }) {
           </div>
 
           <h1 className="text-xl font-semibold text-slate-950 tracking-tight">
-            Sign in to LifeOS
+            Sign in to Epta LifeOS
           </h1>
 
           <p className="text-xs text-slate-500 mt-2.5 leading-relaxed max-w-[280px]">

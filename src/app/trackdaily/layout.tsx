@@ -48,7 +48,7 @@ export default function TrackDailyLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] text-slate-900">
+    <div className="min-h-screen bg-background text-foreground">
       <KeyboardShortcutsHint />
 
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95">
@@ -57,13 +57,13 @@ export default function TrackDailyLayout({ children }: { children: React.ReactNo
             <Link
               href="/"
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
-              title="Go to LifeOS"
+              title="Go to Epta LifeOS"
             >
               <Home className="h-4 w-4" />
             </Link>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                TrackDaily
+                Epta LifeOS
               </p>
               <h1 className="truncate text-sm font-semibold text-slate-950">
                 {sectionLabel(pathname)}

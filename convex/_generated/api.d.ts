@@ -8,7 +8,12 @@
  * @module
  */
 
+import type * as calendar from "../calendar.js";
+import type * as crons from "../crons.js";
+import type * as push from "../push.js";
+import type * as reminders from "../reminders.js";
 import type * as tasks from "../tasks.js";
+import type * as testData from "../testData.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +22,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  calendar: typeof calendar;
+  crons: typeof crons;
+  push: typeof push;
+  reminders: typeof reminders;
   tasks: typeof tasks;
+  testData: typeof testData;
 }>;
 
 /**

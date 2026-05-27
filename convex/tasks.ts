@@ -28,6 +28,10 @@ const checklistValidator = v.array(
   })
 );
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T/;
+
 type AuthInfo = {
   canonicalUserId: string;
   readableUserIds: string[];
@@ -82,6 +86,72 @@ function randomId(): string {
   return Math.random().toString(36).slice(2, 15) + Math.random().toString(36).slice(2, 15);
 }
 
+function assertDate(value: string, field: string) {
+  if (!DATE_RE.test(value)) throw new Error(`${field} must be YYYY-MM-DD`);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new Error(`${field} must be a valid calendar date`);
+  }
+}
+
+function assertTime(value: string | undefined, field: string) {
+  if (value !== undefined && !TIME_RE.test(value)) {
+    throw new Error(`${field} must be HH:MM in 24-hour time`);
+  }
+}
+
+function assertIso(value: string | undefined, field: string) {
+  if (value !== undefined && (!ISO_RE.test(value) || Number.isNaN(Date.parse(value)))) {
+    throw new Error(`${field} must be an ISO datetime`);
+  }
+}
+
+function assertNonEmpty(value: string | undefined, field: string) {
+  if (value !== undefined && value.trim().length === 0) {
+    throw new Error(`${field} cannot be empty`);
+  }
+}
+
+function assertRecurringRule(rule: Doc<"tasks">["recurringRule"] | undefined, plannedDate?: string) {
+  if (!rule) return;
+  if (rule.frequency === "weekly") {
+    if (!rule.daysOfWeek?.length) throw new Error("Weekly recurring tasks require daysOfWeek");
+    if (rule.daysOfWeek.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+      throw new Error("daysOfWeek values must be integers from 0 to 6");
+    }
+  }
+  if (rule.endDate) {
+    assertDate(rule.endDate, "recurringRule.endDate");
+    if (plannedDate && rule.endDate < plannedDate) {
+      throw new Error("recurringRule.endDate cannot be before plannedDate");
+    }
+  }
+}
+
+function assertTaskWrite(args: {
+  title?: string;
+  category?: string;
+  plannedDate?: string;
+  plannedTime?: string;
+  completedAt?: string;
+  status?: Doc<"tasks">["status"];
+  recurringRule?: Doc<"tasks">["recurringRule"];
+  isRecurring?: boolean;
+}) {
+  assertNonEmpty(args.title, "title");
+  assertNonEmpty(args.category, "category");
+  if (args.plannedDate) assertDate(args.plannedDate, "plannedDate");
+  assertTime(args.plannedTime, "plannedTime");
+  assertIso(args.completedAt, "completedAt");
+  assertRecurringRule(args.recurringRule, args.plannedDate);
+  if (args.isRecurring === false && args.recurringRule) {
+    throw new Error("recurringRule is only valid for recurring tasks");
+  }
+  if ((args.status === "done" || args.status === "done_late") && !args.completedAt) {
+    throw new Error("Completed tasks require completedAt");
+  }
+}
+
 function recurringMatchesDate(task: Doc<"tasks">, targetDate: Date, targetDateStr: string) {
   if (!task.recurringRule) return false;
   if (task.recurringRule.endDate && targetDateStr > task.recurringRule.endDate) return false;
@@ -128,6 +198,53 @@ async function getTaskForOwner(ctx: MutationCtx, id: Id<"tasks">, auth: AuthInfo
     throw new Error("Unauthorized: Task does not belong to user");
   }
   return task;
+}
+
+async function scheduleTaskReminder(ctx: MutationCtx, auth: AuthInfo, task: Doc<"tasks">) {
+  const existing = await ctx.db
+    .query("taskReminderSchedules")
+    .withIndex("by_taskId", (q) => q.eq("taskId", task._id))
+    .unique();
+
+  if (!task.plannedTime || task.status !== "planned") {
+    if (existing && auth.readableUserIds.includes(existing.userId)) {
+      await ctx.db.patch(existing._id, {
+        status: "cancelled",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return;
+  }
+
+  const settings = await ctx.db
+    .query("reminderSettings")
+    .withIndex("by_userId", (q) => q.eq("userId", auth.canonicalUserId))
+    .unique();
+  const offsetMinutes = settings?.taskReminderOffsetMinutes ?? 10;
+  const plannedFor = new Date(`${task.plannedDate}T${task.plannedTime}:00`);
+  if (Number.isNaN(plannedFor.getTime())) return;
+
+  const scheduledFor = new Date(plannedFor.getTime() - offsetMinutes * 60_000).toISOString();
+  const now = new Date().toISOString();
+
+  if (existing && auth.readableUserIds.includes(existing.userId)) {
+    await ctx.db.patch(existing._id, {
+      scheduledFor,
+      status: "scheduled",
+      snoozedUntil: undefined,
+      updatedAt: now,
+    });
+    return;
+  }
+
+  await ctx.db.insert("taskReminderSchedules", {
+    userId: auth.canonicalUserId,
+    taskId: task._id,
+    scheduledFor,
+    status: "scheduled",
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 async function findDailyReview(ctx: QueryCtx | MutationCtx, auth: AuthInfo, date: string) {
@@ -185,7 +302,7 @@ async function generateRecurringInstancesForUser(ctx: MutationCtx, auth: AuthInf
 
       if (existing.some(Boolean)) continue;
 
-      await ctx.db.insert("tasks", {
+      const instanceId = await ctx.db.insert("tasks", {
         userId: auth.canonicalUserId,
         title: template.title,
         notes: template.notes,
@@ -203,6 +320,8 @@ async function generateRecurringInstancesForUser(ctx: MutationCtx, auth: AuthInf
         createdAt: nowStr,
         updatedAt: nowStr,
       });
+      const instance = await ctx.db.get(instanceId);
+      if (instance) await scheduleTaskReminder(ctx, auth, instance);
       created += 1;
     }
   }
@@ -213,6 +332,7 @@ async function generateRecurringInstancesForUser(ctx: MutationCtx, auth: AuthInf
 export const getTasksByDate = query({
   args: { date: v.string() },
   handler: async (ctx, args) => {
+    assertDate(args.date, "date");
     const auth = await getOptionalAuth(ctx);
     if (!auth) return [];
     return await getUserTasksByDate(ctx, auth, args.date);
@@ -256,10 +376,13 @@ export const createTask = mutation({
   },
   handler: async (ctx, args) => {
     const auth = await requireAuth(ctx);
+    assertTaskWrite(args);
     const taskId = await ctx.db.insert("tasks", {
       ...args,
       userId: auth.canonicalUserId,
     });
+    const task = await ctx.db.get(taskId);
+    if (task) await scheduleTaskReminder(ctx, auth, task);
     await generateRecurringInstancesForUser(ctx, auth);
     return taskId;
   },
@@ -285,13 +408,22 @@ export const updateTask = mutation({
   },
   handler: async (ctx, args) => {
     const auth = await requireAuth(ctx);
-    await getTaskForOwner(ctx, args.id, auth);
+    const existing = await getTaskForOwner(ctx, args.id, auth);
 
     const { id, ...fields } = args;
+    assertTaskWrite({
+      ...existing,
+      ...fields,
+      plannedTime: fields.plannedTime === undefined ? existing.plannedTime : fields.plannedTime,
+      completedAt: fields.completedAt === undefined ? existing.completedAt : fields.completedAt,
+      recurringRule: fields.recurringRule === undefined ? existing.recurringRule : fields.recurringRule,
+    });
     await ctx.db.patch(id, {
       ...fields,
       userId: auth.canonicalUserId,
     });
+    const updatedTask = await ctx.db.get(id);
+    if (updatedTask) await scheduleTaskReminder(ctx, auth, updatedTask);
 
     if (fields.isRecurring || fields.recurringRule) {
       await generateRecurringInstancesForUser(ctx, auth);
@@ -330,6 +462,8 @@ export const createDailyReview = mutation({
   },
   handler: async (ctx, args) => {
     const auth = await requireAuth(ctx);
+    assertDate(args.date, "date");
+    assertIso(args.reviewedAt, "reviewedAt");
     const existing = await findDailyReview(ctx, auth, args.date);
     if (existing) await ctx.db.delete(existing._id);
 
@@ -343,6 +477,7 @@ export const createDailyReview = mutation({
 export const getDailyReview = query({
   args: { date: v.string() },
   handler: async (ctx, args) => {
+    assertDate(args.date, "date");
     const auth = await getOptionalAuth(ctx);
     if (!auth) return null;
     return await findDailyReview(ctx, auth, args.date);
@@ -372,6 +507,8 @@ export const createWeeklyReview = mutation({
   },
   handler: async (ctx, args) => {
     const auth = await requireAuth(ctx);
+    assertDate(args.weekStart, "weekStart");
+    assertIso(args.reviewedAt, "reviewedAt");
     const existing = await findWeeklyReview(ctx, auth, args.weekStart);
     if (existing) await ctx.db.delete(existing._id);
 
@@ -385,6 +522,7 @@ export const createWeeklyReview = mutation({
 export const getWeeklyReview = query({
   args: { weekStart: v.string() },
   handler: async (ctx, args) => {
+    assertDate(args.weekStart, "weekStart");
     const auth = await getOptionalAuth(ctx);
     if (!auth) return null;
     return await findWeeklyReview(ctx, auth, args.weekStart);

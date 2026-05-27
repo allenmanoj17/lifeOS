@@ -21,6 +21,8 @@
 
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
 
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
@@ -33,6 +35,27 @@
 
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
+  --color-sky-50: #edf7f5;
+  --color-sky-100: #d8ebe7;
+  --color-sky-200: #b8d8d2;
+  --color-sky-300: #8dbeb8;
+  --color-sky-400: #5a9b95;
+  --color-sky-500: #2e716d;
+  --color-sky-600: #28635f;
+  --color-sky-700: #22534f;
+  --color-sky-800: #1c423f;
+  --color-sky-900: #173634;
+  --color-slate-50: #faf6ef;
+  --color-slate-100: #f1eadf;
+  --color-slate-200: #ded2c1;
+  --color-slate-300: #cbbba4;
+  --color-slate-400: #9d8d78;
+  --color-slate-500: #756858;
+  --color-slate-600: #5d5044;
+  --color-slate-700: #493d33;
+  --color-slate-800: #342b24;
+  --color-slate-900: #241d18;
+  --color-slate-950: #17120e;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -65,63 +88,63 @@
 }
 
 :root {
-  /* Cognitive Eggshell Light Theme */
-  --background: 220 15% 97.5%;
-  --foreground: 224 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 224 47% 11%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 224 47% 11%;
+  /* Epta LifeOS Warm Personal OS */
+  --background: 42 45% 96%;
+  --foreground: 24 17% 13%;
+  --card: 40 50% 99%;
+  --card-foreground: 24 17% 13%;
+  --popover: 40 50% 99%;
+  --popover-foreground: 24 17% 13%;
   
-  /* Focus Accent Palettes */
-  --primary: 190 95% 38%; /* Cognitive Sky */
-  --primary-foreground: 0 0% 100%;
+  --primary: 176 42% 31%;
+  --primary-foreground: 42 45% 96%;
   
-  --secondary: 220 14% 90%;
-  --secondary-foreground: 224 47% 11%;
+  --secondary: 42 28% 89%;
+  --secondary-foreground: 24 17% 13%;
   
-  --muted: 220 14% 93%;
-  --muted-foreground: 220 10% 40%;
+  --muted: 39 28% 91%;
+  --muted-foreground: 28 10% 42%;
   
-  --accent: 190 95% 38%; /* Clear Sky Cyan */
-  --accent-foreground: 0 0% 100%;
+  --accent: 79 24% 43%;
+  --accent-foreground: 42 45% 96%;
   
-  --destructive: 350 78% 58%; /* Growth Coral */
-  --destructive-foreground: 0 0% 100%;
+  --destructive: 8 45% 48%;
+  --destructive-foreground: 42 45% 96%;
   
-  --border: 220 14% 88%;
-  --input: 220 14% 90%;
-  --ring: 250 85% 58%;
+  --border: 36 24% 82%;
+  --input: 36 24% 82%;
+  --ring: 176 42% 31%;
   --radius: 0.5rem;
 
-  /* Color Psychology Status HSL Variables */
-  --status-planned: 200 95% 42%;  /* Calm Blue */
-  --status-done: 142 55% 40%;     /* Growth Sage */
-  --status-late: 38 92% 45%;      /* Alert Amber */
-  --status-missed: 350 78% 55%;   /* Reflective Coral */
-  --status-skipped: 220 10% 55%;   /* Neutrals Slate */
+  --success: 95 26% 38%;
+  --warning: 38 74% 46%;
+  --status-planned: 176 42% 31%;
+  --status-done: 95 26% 38%;
+  --status-late: 38 74% 46%;
+  --status-missed: 8 45% 48%;
+  --status-skipped: 28 10% 42%;
 }
 
 /* Product surfaces */
 .glass-panel {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 2px rgba(70, 55, 38, 0.05);
   border-radius: 0.5rem;
 }
 
 .glass-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 2px rgba(70, 55, 38, 0.05);
   border-radius: 0.5rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .glass-card:hover {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  background: hsl(var(--card));
+  border-color: hsl(var(--primary) / 0.35);
+  box-shadow: 0 6px 18px rgba(70, 55, 38, 0.07);
 }
 
 .glass-card-cyan:hover {
@@ -131,17 +154,95 @@
 }
 
 .glass-input {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: #fffdf8;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  color: #111827;
+  color: hsl(var(--foreground));
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .glass-input:focus {
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
   outline: none;
+}
+
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary));
+}
+
+.btn-primary:hover {
+  background: hsl(176 42% 27%);
+}
+
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #fffdf8;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.btn-secondary:hover {
+  background: hsl(var(--muted));
+}
+
+.badge-primary,
+.badge-success,
+.badge-warning,
+.badge-destructive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.badge-primary {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.2);
+}
+
+.badge-success {
+  color: hsl(var(--success));
+  background: hsl(var(--success) / 0.12);
+  border-color: hsl(var(--success) / 0.22);
+}
+
+.badge-warning {
+  color: hsl(var(--warning));
+  background: hsl(var(--warning) / 0.12);
+  border-color: hsl(var(--warning) / 0.22);
+}
+
+.badge-destructive {
+  color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.1);
+  border-color: hsl(var(--destructive) / 0.22);
 }
 
 /* Light Theme Psychological Color Tints */
@@ -188,7 +289,7 @@
 
 /* Base Body Styles */
 body {
-  background-color: #f6f7f9;
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   overflow-x: hidden;
 }

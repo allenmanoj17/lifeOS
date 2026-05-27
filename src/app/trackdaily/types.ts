@@ -44,3 +44,42 @@ export interface WeeklyReview {
   reflectionNote?: string;
   reviewedAt: string;
 }
+
+export type CalendarSyncStatus =
+  | "not_connected"
+  | "connecting"
+  | "synced"
+  | "failed"
+  | "permission_missing";
+
+export interface CalendarAccountState {
+  status: CalendarSyncStatus;
+  email?: string;
+  providerAccountId?: string;
+  approvedScopes?: string;
+  lastSyncedAt?: string;
+  syncRangeStart?: string;
+  syncRangeEnd?: string;
+  error?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  externalId: string;
+  title: string;
+  description?: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  location?: string;
+}
+
+export interface ReminderSettings {
+  taskReminderOffsetMinutes: number;
+  eveningReviewEnabled: boolean;
+  eveningReviewTime: string;
+  weeklyReviewEnabled: boolean;
+  weeklyReviewDay: number;
+  weeklyReviewTime: string;
+  timezone: string;
+}

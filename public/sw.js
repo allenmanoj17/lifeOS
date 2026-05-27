@@ -1,4 +1,4 @@
-const CACHE_NAME = "lifeos-cache-v1";
+const CACHE_NAME = "epta-lifeos-cache-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/trackdaily",
@@ -63,6 +63,65 @@ self.addEventListener("fetch", (event) => {
         // Offline fallback
         return caches.match("/");
       });
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { title: "Epta LifeOS", body: event.data?.text() || "Reminder" };
+  }
+
+  const title = payload.title || "Epta LifeOS";
+  const options = {
+    body: payload.body || "Reminder",
+    icon: payload.icon || "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: payload.tag || "epta-reminder",
+    data: payload.data || { url: "/trackdaily" },
+    actions: payload.actions || [
+      { action: "done", title: "Done" },
+      { action: "snooze_15", title: "Snooze 15 min" },
+      { action: "skip", title: "Skip" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/trackdaily";
+
+  if (event.action) {
+    event.waitUntil(
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((clients) => {
+          for (const client of clients) {
+            client.postMessage({
+              type: "EPTA_NOTIFICATION_ACTION",
+              action: event.action,
+              taskId: event.notification.data?.taskId,
+            });
+          }
+        })
+    );
+    return;
+  }
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
 });

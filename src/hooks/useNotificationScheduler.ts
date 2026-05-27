@@ -1,99 +1,80 @@
 "use client";
 
 import { useEffect } from "react";
-import { Task } from "@/app/trackdaily/types";
+import { ReminderSettings, Task } from "@/app/trackdaily/types";
 import { formatDateString } from "@/app/trackdaily/db";
 
-export function useNotificationScheduler(allTasks: Task[]) {
+export function useNotificationScheduler(allTasks: Task[], settings: ReminderSettings | null) {
   useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || !("Notification" in window) || !settings) return;
 
     const checkAndTriggerNotifications = () => {
       if (Notification.permission !== "granted") return;
 
       const now = new Date();
       const todayStr = formatDateString(now);
-      const currentHours = now.getHours().toString().padStart(2, "0");
-      const currentMinutes = now.getMinutes().toString().padStart(2, "0");
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
-      
-      // Get settings from localstorage
-      const eveningTime = localStorage.getItem("lifeos_settings_evening_time") || "21:00";
-      const weeklyDay = localStorage.getItem("lifeos_settings_weekly_day") || "Sunday";
-      const weeklyTime = localStorage.getItem("lifeos_settings_weekly_time") || "19:00";
-      const reminderOffset = parseInt(localStorage.getItem("lifeos_settings_reminder_offset") || "10", 10);
-
-      // --- 1. EVENING REFLECTION REMINDER ---
-      if (currentTimeStr >= eveningTime) {
-        const lastEveningNotif = localStorage.getItem("lifeos_last_notif_evening");
+      const currentTimeStr = `${now.getHours().toString().padStart(2, "0")}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
+      if (settings.eveningReviewEnabled && currentTimeStr >= settings.eveningReviewTime) {
+        const lastEveningNotif = sessionStorage.getItem("epta_last_notif_evening");
         if (lastEveningNotif !== todayStr) {
-          new Notification("EOD Review Open", {
-            body: "Time to log your daily reflection and plan for tomorrow!",
+          new Notification("Evening review", {
+            body: "Close the day with a short reflection and plan tomorrow.",
             icon: "/icon-192.png",
             tag: "evening-reflection",
+            data: { url: "/trackdaily/review" },
           });
-          localStorage.setItem("lifeos_last_notif_evening", todayStr);
+          sessionStorage.setItem("epta_last_notif_evening", todayStr);
         }
       }
 
-      // --- 2. WEEKLY REVIEW REMINDER ---
-      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const currentDayName = dayNames[now.getDay()];
-      if (currentDayName === weeklyDay && currentTimeStr >= weeklyTime) {
-        const lastWeeklyNotif = localStorage.getItem("lifeos_last_notif_weekly");
-        // We use the current date string as the trigger guard for the weekly check
+      if (
+        settings.weeklyReviewEnabled &&
+        now.getDay() === settings.weeklyReviewDay &&
+        currentTimeStr >= settings.weeklyReviewTime
+      ) {
+        const lastWeeklyNotif = sessionStorage.getItem("epta_last_notif_weekly");
         if (lastWeeklyNotif !== todayStr) {
-          new Notification("Weekly Performance Review", {
-            body: "Close out your weekly matrix and audit your behavior scores!",
+          new Notification("Weekly review", {
+            body: "Review the week and choose the next focus.",
             icon: "/icon-192.png",
             tag: "weekly-review",
+            data: { url: "/trackdaily/review" },
           });
-          localStorage.setItem("lifeos_last_notif_weekly", todayStr);
+          sessionStorage.setItem("epta_last_notif_weekly", todayStr);
         }
       }
 
-      // --- 3. TASK-SPECIFIC REMINDERS ---
-      // Filter tasks planned for today that have a planned time and are not yet completed
-      const todayPlannedTasks = allTasks.filter(
-        (task) =>
-          task.plannedDate === todayStr &&
-          task.plannedTime &&
-          task.status === "planned"
-      );
+      allTasks
+        .filter((task) => task.plannedDate === todayStr && task.plannedTime && task.status === "planned")
+        .forEach((task) => {
+          if (!task.plannedTime) return;
+          const [hours, minutes] = task.plannedTime.split(":").map(Number);
+          const taskDateTime = new Date(now);
+          taskDateTime.setHours(hours, minutes, 0, 0);
 
-      todayPlannedTasks.forEach((task) => {
-        if (!task.plannedTime) return;
+          const triggerTime = new Date(
+            taskDateTime.getTime() - settings.taskReminderOffsetMinutes * 60_000
+          );
+          if (now < triggerTime || now >= taskDateTime) return;
 
-        const [tHours, tMinutes] = task.plannedTime.split(":").map(Number);
-        const taskDateTime = new Date(now);
-        taskDateTime.setHours(tHours, tMinutes, 0, 0);
+          const firedKey = `epta_last_notif_task_${task.id}`;
+          if (sessionStorage.getItem(firedKey)) return;
 
-        // Compute reminder trigger time (task time minus offset minutes)
-        const triggerTime = new Date(taskDateTime.getTime() - reminderOffset * 60000);
-        
-        // If we are at or past the trigger time, but not past the task time itself
-        if (now >= triggerTime && now < taskDateTime) {
-          const firedKey = `lifeos_last_notif_task_${task.id}`;
-          const hasFired = localStorage.getItem(firedKey);
-          
-          if (!hasFired) {
-            new Notification(`Upcoming Task: ${task.title}`, {
-              body: `Scheduled for ${task.plannedTime} (${task.category})`,
-              icon: "/icon-192.png",
-              tag: `task-${task.id}`,
-            });
-            localStorage.setItem(firedKey, "true");
-          }
-        }
-      });
+          new Notification(`Upcoming Task: ${task.title}`, {
+            body: `Scheduled for ${task.plannedTime} (${task.category})`,
+            icon: "/icon-192.png",
+            tag: `task-${task.id}`,
+            data: { taskId: task.id, url: "/trackdaily" },
+          });
+          sessionStorage.setItem(firedKey, "true");
+        });
     };
 
-    // Initial check
     checkAndTriggerNotifications();
-
-    // Check every 60 seconds
-    const interval = setInterval(checkAndTriggerNotifications, 60000);
-
+    const interval = setInterval(checkAndTriggerNotifications, 60_000);
     return () => clearInterval(interval);
-  }, [allTasks]);
+  }, [allTasks, settings]);
 }

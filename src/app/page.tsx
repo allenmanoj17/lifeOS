@@ -43,12 +43,12 @@ export default function LifeOSHub() {
   const nextTask = tasks.find((task) => task.status === "planned");
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] font-jakarta text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-background font-jakarta text-foreground">
+      <header className="border-b border-border bg-card">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              LifeOS
+              Epta LifeOS
             </p>
             <h1 className="text-base font-semibold text-slate-950">{dateTime.greeting}</h1>
           </div>
@@ -67,8 +67,8 @@ export default function LifeOSHub() {
               <span className="text-2xl font-semibold text-slate-950">{completed}/{total}</span>
               <span className="text-xs font-semibold text-slate-500">{progressPct}% done</span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-sky-600 transition-all" style={{ width: `${progressPct}%` }} />
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
 
@@ -85,7 +85,7 @@ export default function LifeOSHub() {
           <div className="glass-panel p-4">
             <p className="text-xs font-medium text-slate-500">System</p>
             <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-950">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="h-2 w-2 rounded-full bg-success" />
               Convex and Clerk
             </div>
             <p className="mt-1 text-xs text-slate-500">Primary data path enabled</p>
@@ -96,7 +96,7 @@ export default function LifeOSHub() {
           <Link href="/trackdaily" className="group glass-panel block p-5 transition-colors hover:border-slate-300">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Activity className="h-5 w-5" />
                 </div>
                 <div>
@@ -116,7 +116,7 @@ export default function LifeOSHub() {
                 <p className="text-lg font-semibold text-slate-950">{completed}</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <CalendarDays className="h-4 w-4 text-sky-700" />
+                <CalendarDays className="h-4 w-4 text-primary" />
                 <p className="mt-2 text-xs font-medium text-slate-500">Planned</p>
                 <p className="text-lg font-semibold text-slate-950">{total}</p>
               </div>

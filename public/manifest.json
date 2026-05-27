@@ -1,11 +1,11 @@
 {
-  "name": "LifeOS",
-  "short_name": "LifeOS",
-  "description": "Personal planning, habits, and behavioral analytics hub.",
+  "name": "Epta LifeOS",
+  "short_name": "Epta",
+  "description": "Warm personal OS for planning, reviews, calendar awareness, and reminders.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#f8f3e8",
+  "theme_color": "#2e716d",
   "orientation": "portrait",
   "icons": [
     {
